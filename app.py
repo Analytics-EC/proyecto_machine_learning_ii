@@ -59,7 +59,9 @@ def inicializar_entorno_ia():
     rf = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=42).fit(X_train_scaled, y_train)
     xgb = XGBClassifier(n_estimators=50, max_depth=3, objective='multi:softprob', random_state=42).fit(X_train_scaled, y_train)
     nb = GaussianNB().fit(X_train_scaled, y_train)
-    softmax = LogisticRegression(multi_class='multinomial', solver='lbfgs', max_iter=200, random_state=42).fit(X_train_scaled, y_train)
+    
+    # 1. CORRECCIÓN MULTICLASE: Removido el parámetro obsoleto en la inicialización base
+    softmax = LogisticRegression(solver='lbfgs', max_iter=200, random_state=42).fit(X_train_scaled, y_train)
 
     MODELOS_POOL = {"Random Forest": rf, "XGBoost": xgb, "Naive Bayes": nb, "Softmax Regression": softmax}
 
@@ -282,14 +284,17 @@ def retrain_and_benchmark():
             if ":" in linea:
                 clave, valores = linea.split(":", 1)
                 param_grid[clave.strip()] = [evaluar_tipo_estricto(x) for x in valores.split(",")]
+        
         if modelo_seleccionado == "Random Forest":
             estimator = RandomForestClassifier(random_state=42)
         elif modelo_seleccionado == "XGBoost":
             estimator = XGBClassifier(objective='multi:softprob', random_state=42)
         elif modelo_seleccionado == "Softmax Regression":
-            estimator = LogisticRegression(multi_class='multinomial', solver='lbfgs', max_iter=500, random_state=42)
+            # 2. CORRECCIÓN MULTICLASE: Removido el parámetro obsoleto en el reentrenamiento de malla fija
+            estimator = LogisticRegression(solver='lbfgs', max_iter=500, random_state=42)
         else:
             estimator = GaussianNB()
+            
         resultados_lista = []
         t_start = time.perf_counter()
         gs = GridSearchCV(estimator, param_grid, cv=3, scoring='accuracy', n_jobs=-1)
@@ -315,6 +320,7 @@ def retrain_and_benchmark():
             "test_acc": f"{accuracy_score(Y_TEST, rs.best_estimator_.predict(X_TEST_SCALED))*100:.2f}%"
         })
         t_start = time.perf_counter()
+        
         def objective(trial):
             params = {}
             for param_name, valores in param_grid.items():
@@ -336,21 +342,26 @@ def retrain_and_benchmark():
             elif modelo_seleccionado == "XGBoost":
                 clf = XGBClassifier(**params, objective='multi:softprob', random_state=42)
             elif modelo_seleccionado == "Softmax Regression":
-                clf = LogisticRegression(**params, multi_class='multinomial', solver='lbfgs', max_iter=500, random_state=42)
+                # 3. CORRECCIÓN MULTICLASE: Removido en el estimador dinámico del bucle interno de Optuna
+                clf = LogisticRegression(**params, solver='lbfgs', max_iter=500, random_state=42)
             else:
                 clf = GaussianNB(**params)
             return cross_val_score(clf, X_TRAIN_SCALED, Y_TRAIN, cv=3, scoring='accuracy').mean()
+            
         study = optuna.create_study(direction="maximize")
         study.optimize(objective, n_trials=10)
         t_optuna = time.perf_counter() - t_start
+        
         if modelo_seleccionado == "Random Forest":
             opt_clf = RandomForestClassifier(**study.best_params, random_state=42).fit(X_TRAIN_SCALED, Y_TRAIN)
         elif modelo_seleccionado == "XGBoost":
             opt_clf = XGBClassifier(**study.best_params, objective='multi:softprob', random_state=42).fit(X_TRAIN_SCALED, Y_TRAIN)
         elif modelo_seleccionado == "Softmax Regression":
-            opt_clf = LogisticRegression(**study.best_params, multi_class='multinomial', solver='lbfgs', max_iter=500, random_state=42).fit(X_TRAIN_SCALED, Y_TRAIN)
+            # 4. CORRECCIÓN MULTICLASE: Removido en el ajuste del estimador final optimizado por Bayes
+            opt_clf = LogisticRegression(**study.best_params, solver='lbfgs', max_iter=500, random_state=42).fit(X_TRAIN_SCALED, Y_TRAIN)
         else:
             opt_clf = GaussianNB(**study.best_params).fit(X_TRAIN_SCALED, Y_TRAIN)
+            
         resultados_lista.append({
             "estrategia": "Optuna (Muestreo Bayesiano)",
             "tiempo": f"{t_optuna:.4f}s",
@@ -386,9 +397,5 @@ def evaluar_tipo_estricto(v_str):
     except ValueError:
         return v
 
-# if __name__ == "__main__":
-#     app.run(debug=True)
-    
-    #Para despliegue en producción:
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
