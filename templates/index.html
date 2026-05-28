@@ -2,7 +2,8 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>UP | Laboratorio de Inteligencia Artificial</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UP | Laboratorio Avanzado de Inteligencia Artificial</title>
     <link href="https://cdn.jsdelivr.net/npm/vuetify@3.5.2/dist/vuetify.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.x/css/materialdesignicons.min.css" rel="stylesheet">
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
@@ -16,35 +17,15 @@
         }
         .text-navy { color: #132B4F; }
         .text-guinda { color: #8B1D2F; }
-        
-        .col-fija {
-            width: 175px !important;
-            min-width: 175px !important;
-            max-width: 175px !important;
-            padding: 8px !important;
-        }
-        /* Columna especial más delgada para la acción de borrar */
-        .col-accion {
-            width: 80px !important;
-            min-width: 80px !important;
-            max-width: 80px !important;
-            padding: 8px !important;
-            text-align: center !important;
-        }
-        .table-wrapper { 
-            border: 1px solid #E1E4E8; 
-            border-radius: 12px; 
-            overflow-x: auto !important; 
-            background: white; 
-            margin-top: 10px;
-        }
+        .col-fija { width: 175px !important; min-width: 175px !important; max-width: 175px !important; padding: 4px !important; }
+        .col-accion { width: 80px !important; min-width: 80px !important; max-width: 80px !important; padding: 4px !important; text-align: center !important; }
+        .table-wrapper { border: 1px solid #E1E4E8; border-radius: 12px; overflow-x: auto !important; background: white; margin-top: 10px; }
         .v-table { background: white !important; width: max-content !important; }
-        .celda-input .v-field__input {
-            padding-top: 4px !important;
-            padding-bottom: 4px !important;
-            font-size: 13px !important;
-            text-align: center !important;
-        }
+        .celda-input .v-field__input { padding-top: 4px !important; padding-bottom: 4px !important; font-size: 13px !important; text-align: center !important; }
+        .code-grid .v-field__input { font-family: 'Courier New', Courier, monospace !important; background-color: #FFFDF9 !important; font-size: 14px !important; color: #8B1D2F !important; }
+        .text-verde-premium { color: #2E7D32 !important; font-weight: bold !important; }
+        .carousel-card { background: linear-gradient(135deg, #132B4F 0%, #1A3D6C 100%) !important; color: white !important; border-radius: 16px !important; }
+        .param-chip { font-family: monospace; font-weight: bold; background-color: #F5E8D0 !important; color: #8B1D2F !important; }
     </style>
 </head>
 <body>
@@ -53,19 +34,21 @@
             
             <div class="up-navbar pa-4 d-flex align-center justify-space-between flex-wrap">
                 <div class="d-flex align-center">
-                    <v-img src="{{ url_for('static', filename='logo_up.png') }}" max-height="65" max-width="180" contain class="mr-4"></v-img>
+                    <v-img src="{{ url_for('static', filename='logo_up.png') }}" max-height="175" style="width: 240px; min-width: 240px;" class="mr-6"></v-img>
                     <div>
-                        <h1 class="text-h5 font-weight-bold text-navy" style="font-family: 'Montserrat', sans-serif;">
+                        <h1 class="text-h4 font-weight-bold text-navy" style="font-family: 'Montserrat', sans-serif; letter-spacing: -0.5px;">
                             Laboratorio de Machine Learning 2
                         </h1>
-                        <p class="text-caption text-grey-darken-2 mb-0">Profesor: <strong class="text-guinda">Dr. León Palafox</strong></p>
+                        <p class="text-caption text-grey-darken-2 mb-0">Profesor: <strong class="text-guinda" v-text="professorName"></strong></p>
                     </div>
                 </div>
 
                 <v-tabs v-model="activeTab" color="#8B1D2F" @update:model-value="manejarCambioTab">
                     <v-tab value="proyecciones"><v-icon start icon="mdi-chart-scatter-plot"></v-icon>Proyecciones</v-tab>
-                    <v-tab value="modelos"><v-icon start icon="mdi-brain"></v-icon>Métricas Avanzadas</v-tab>
+                    <v-tab value="modelos"><v-icon start icon="mdi-brain"></v-icon>Catálogo Académico</v-tab>
                     <v-tab value="editor"><v-icon start icon="mdi-table-edit"></v-icon>Módulo de Inferencia (.csv)</v-tab>
+                    <v-tab value="retrain"><v-icon start icon="mdi-gauge"></v-icon>Optimización (Optuna)</v-tab>
+                    <v-tab value="equipo"><v-icon start icon="mdi-account-group"></v-icon>Equipo</v-tab>
                 </v-tabs>
             </div>
 
@@ -75,28 +58,17 @@
                         
                         <v-window-item value="proyecciones">
                             <v-row>
-                                <v-col cols="12" md="4">
-                                    <v-card class="up-card-premium pa-6">
-                                        <div class="text-subtitle-1 font-weight-bold text-navy mb-4">Integrantes del Equipo</div>
-                                        <div v-for="m in integrantes" :key="m.email" class="mb-3 border-bottom pb-1">
-                                            <div class="text-body-2 font-weight-bold text-grey-darken-3" v-text="m.nombre"></div>
-                                            <div class="text-caption text-guinda" v-text="m.email"></div>
-                                        </div>
-                                    </v-card>
-                                </v-col>
-                                <v-col cols="12" md="8">
-                                    <v-card class="up-card-premium pa-6">
+                                <v-col cols="12">
+                                    <v-card class="up-card-premium pa-6" elevation="0">
                                         <div class="d-flex justify-space-between align-center mb-4 flex-wrap">
-                                            <div>
-                                                <h3 class="text-h6 font-weight-bold text-navy">Reducción Espacial</h3>
-                                            </div>
+                                            <div><h3 class="text-h6 font-weight-bold text-navy">Reducción Espacial Inteligente del Dataset</h3></div>
                                             <v-btn-toggle v-model="algoritmoDim" mandatory color="#132B4F" variant="tonal" rounded="lg" @update:model-value="dibujarGrafico">
                                                 <v-btn value="pca" size="small">PCA</v-btn>
                                                 <v-btn value="tsne" size="small">t-SNE</v-btn>
                                                 <v-btn value="umap" size="small">UMAP</v-btn>
                                             </v-btn-toggle>
                                         </div>
-                                        <div id="plotly-chart-area" style="width: 100%; height: 430px;"></div>
+                                        <div id="plotly-chart-area" style="width: 100%; height: 480px;"></div>
                                     </v-card>
                                 </v-col>
                             </v-row>
@@ -104,117 +76,243 @@
 
                         <v-window-item value="modelos">
                             <v-row>
-                                <v-col cols="12" v-for="(stats, name) in mlData.modelos" :key="name" md="6" class="mb-4">
-                                    <v-card class="up-card-premium pa-5">
-                                        <div class="text-h6 font-weight-bold text-navy border-b pb-2 mb-3" v-text="name"></div>
-                                        <v-row class="text-center my-2">
-                                            <v-col cols="6">
-                                                <div class="text-caption text-grey font-weight-bold">TRAIN ACCURACY</div>
-                                                <div class="text-h4 font-weight-black text-grey-darken-3" v-text="stats.train_acc"></div>
-                                            </v-col>
-                                            <v-col cols="6" style="border-left: 1px solid #eee;">
-                                                <div class="text-caption text-guinda font-weight-bold">TEST ACCURACY</div>
-                                                <div class="text-h4 font-weight-black text-guinda" v-text="stats.test_acc"></div>
-                                            </v-col>
-                                        </v-row>
-                                        <v-row class="bg-grey-lighten-5 rounded-lg pa-2 mx-1 mt-3">
-                                            <v-col cols="6" class="text-left text-caption text-grey-darken-2">
-                                                Precision: <strong v-text="stats.precision"></strong>
-                                            </v-col>
-                                            <v-col cols="6" class="text-left text-caption text-grey-darken-2">
-                                                Recall: <strong v-text="stats.recall"></strong>
-                                            </v-col>
-                                        </v-row>
-                                    </v-card>
+                                <v-col cols="12" md="6">
+                                    <div class="text-h6 font-weight-bold text-navy mb-3"><v-icon start icon="mdi-view-carousel" color="#132B4F"></v-icon> Documentación Científica</div>
+                                    <v-carousel hide-delimiters height="440" show-arrows="hover" v-model="carouselIndex">
+                                        <v-carousel-item v-for="(info, name) in catalogoModelosExplicativos" :key="name">
+                                            <v-card class="carousel-card fill-height pa-6 d-flex flex-column justify-space-between">
+                                                <div>
+                                                    <div class="text-h5 font-weight-bold mb-1" v-text="name"></div>
+                                                    <div class="text-caption text-orange-lighten-4 mb-2">Autor/Origen: <span v-text="info.paper_autor"></span></div>
+                                                    <v-divider color="white" class="mb-4"></v-divider>
+                                                    <p class="text-body-1 mb-4" v-text="info.descripcion"></p>
+                                                    <div class="text-subtitle-2 font-weight-bold text-orange-lighten-3 mb-1">Fortalezas del Algoritmo:</div>
+                                                    <p class="text-body-2 mb-3" v-text="info.fortalezas"></p>
+                                                </div>
+                                                <v-btn color="white" variant="flat" class="text-navy text-capitalize font-weight-bold" block @click="auditarHiperparametrosModelo(name)">
+                                                    <v-icon start icon="mdi-book-open-page-variant"></v-icon> Analizar 7-10 Parámetros e Impacto
+                                                </v-btn>
+                                            </v-card>
+                                        </v-carousel-item>
+                                    </v-carousel>
+                                </v-col>
+
+                                <v-col cols="12" md="6">
+                                    <div class="text-h6 font-weight-bold text-navy mb-3"><v-icon start icon="mdi-chart-timeline-variant" color="#8B1D2F"></v-icon> Rendimiento del Servidor</div>
+                                    <v-row>
+                                        <v-col cols="12" sm="6" v-for="(stats, name) in mlData.modelos" :key="name" class="pb-2">
+                                            <v-card class="up-card-premium pa-4" elevation="0" style="border-left: 5px solid #8B1D2F !important;">
+                                                <div class="text-subtitle-2 font-weight-bold text-navy text-truncate" v-text="name"></div>
+                                                <v-row class="mt-2 text-center" density="compact">
+                                                    <v-col cols="6">
+                                                        <div style="font-size: 10px;" class="text-grey font-weight-bold">TRAIN ACC</div>
+                                                        <div class="text-body-1 font-weight-bold text-grey-darken-3" v-text="stats.train_acc"></div>
+                                                    </v-col>
+                                                    <v-col cols="6" style="border-left: 1px solid #eee;">
+                                                        <div style="font-size: 10px;" class="text-guinda font-weight-bold">TEST ACC</div>
+                                                        <div class="text-body-1 font-weight-bold text-guinda" v-text="stats.test_acc"></div>
+                                                    </v-col>
+                                                </v-row>
+                                            </v-card>
+                                        </v-col>
+                                    </v-row>
                                 </v-col>
                             </v-row>
+
+                            <v-dialog v-model="dialogoHps" max-width="750px" scrollable>
+                                <v-card class="rounded-xl pa-4">
+                                    <v-card-title class="text-h5 font-weight-bold text-navy d-flex align-center justify-space-between">
+                                        <span>Catálogo Estricto: <span v-text="modeloSeleccionadoHps"></span></span>
+                                        <v-btn icon="mdi-close" variant="text" size="small" @click="dialogoHps = false"></v-btn>
+                                    </v-card-title>
+                                    <v-divider class="my-2"></v-divider>
+                                    
+                                    <v-card-text style="max-height: 440px;">
+                                        <div v-for="p in hpDetallesSeleccionados" :key="p.param" class="mb-4 bg-grey-lighten-4 pa-3 rounded-lg border">
+                                            <div class="d-flex align-center justify-space-between mb-1">
+                                                <span class="font-weight-bold text-navy text-subtitle-1" v-text="p.param"></span>
+                                                <v-chip size="small" class="param-chip" v-text="p.rango"></v-chip>
+                                            </div>
+                                            <div class="text-body-2 text-grey-darken-3 mt-1"><strong>Definición Técnica:</strong> <span v-text="p.def"></span></div>
+                                        </div>
+                                    </v-card-text>
+                                    
+                                    <v-divider class="mt-2"></v-divider>
+                                    <v-card-actions class="pt-3">
+                                        <v-row>
+                                            <v-col cols="6">
+                                                <v-btn color="#132B4F" variant="flat" block class="text-capitalize font-weight-bold text-white" :href="linkDocSeleccionado" target="_blank">
+                                                    <v-icon start icon="mdi-api"></v-icon> API Documentación
+                                                </v-btn>
+                                            </v-col>
+                                            <v-col cols="6">
+                                                <v-btn color="#8B1D2F" variant="flat" block class="text-capitalize font-weight-bold text-white" :href="linkPaperSeleccionado" target="_blank">
+                                                    <v-icon start icon="mdi-file-certificate"></v-icon> Ver Paper Científico
+                                                </v-btn>
+                                            </v-col>
+                                        </v-row>
+                                    </v-card-actions>
+                                </v-card>
+                            </v-dialog>
                         </v-window-item>
 
                         <v-window-item value="editor">
                             <v-row>
                                 <v-col cols="12">
-                                    <v-card class="up-card-premium pa-6">
+                                    <v-card class="up-card-premium pa-6" elevation="0">
                                         <div class="text-h6 font-weight-bold text-navy mb-1">Módulo de Inferencia y Edición de Matrices</div>
                                         <p class="text-caption text-grey mb-4">Ingresa parámetros químicos en la tabla de características y observa los resultados predictivos calculados por el backend en la sección de inferencias.</p>
+                                        <v-file-input label="Cargar archivo .csv" variant="outlined" color="#8B1D2F" density="comfortable" prepend-icon="mdi-cloud-upload" @update:model-value="enviarCSVAlServidor" class="mb-2"></v-file-input>
                                         
-                                        <v-file-input
-                                            label="Cargar archivo .csv externo para extraer características"
-                                            variant="outlined" color="#8B1D2F" density="comfortable" prepend-icon="mdi-cloud-upload"
-                                            @update:model-value="enviarCSVAlServidor"
-                                        ></v-file-input>
+                                        <v-row class="mb-4 mt-2">
+                                            <v-col cols="12" sm="6" md="3">
+                                                <v-btn color="success" variant="flat" prepend-icon="mdi-plus" block class="text-capitalize font-weight-bold" @click="agregarFilaVacia">Añadir Fila</v-btn>
+                                            </v-col>
+                                            <v-col cols="12" sm="6" md="3">
+                                                <v-btn color="#132B4F" variant="flat" prepend-icon="mdi-file-table-outline" block class="text-capitalize text-white font-weight-bold" @click="descargarSoloPlantillaFeatures">Plantilla Base (X)</v-btn>
+                                            </v-col>
+                                            <v-col cols="12" sm="6" md="3">
+                                                <v-btn color="grey-darken-3" variant="flat" prepend-icon="mdi-download" block class="text-capitalize font-weight-bold" @click="descargarPrediccionesCompletas">Exportar Predicciones</v-btn>
+                                            </v-col>
+                                            <v-col cols="12" sm="6" md="3">
+                                                <v-btn color="#8B1D2F" variant="flat" prepend-icon="mdi-calculator" block class="text-capitalize font-weight-bold" @click="procesarInferenciaManual" :loading="cargandoInferencia">Calcular Inferencia</v-btn>
+                                            </v-col>
+                                        </v-row>
 
-                                        <div class="d-flex align-center my-4 flex-wrap gap-2">
-                                            <v-btn color="success" variant="flat" prepend-icon="mdi-plus" class="text-capitalize mr-1" @click="agregarFilaVacia">
-                                                Añadir Fila
-                                            </v-btn>
-                                            <v-btn color="#132B4F" variant="flat" prepend-icon="mdi-file-table-outline" class="text-capitalize mr-1" @click="descargarSoloPlantillaFeatures">
-                                                Descargar Plantilla Base (X)
-                                            </v-btn>
-                                            <v-btn color="grey-darken-3" variant="flat" prepend-icon="mdi-download" class="text-capitalize mr-1" @click="descargarPrediccionesCompletas">
-                                                Exportar Predicciones Totales
-                                            </v-btn>
-                                            <v-btn color="#8B1D2F" variant="flat" prepend-icon="mdi-calculator" class="text-capitalize" @click="procesarInferenciaManual" :loading="cargandoInferencia">
-                                                Calcular Inferencia de la Tabla
-                                            </v-btn>
-                                        </div>
-
-                                        <div class="text-subtitle-2 font-weight-bold text-navy mt-4 mb-2 d-flex align-center">
-                                            <v-icon color="#132B4F" start icon="mdi-beaker-outline" class="mr-2"></v-icon>
-                                            1. Matriz de Características Químicas de Entrada (Features $X$)
-                                        </div>
+                                        <div class="text-subtitle-2 font-weight-bold text-navy mt-4 mb-2 d-flex align-center"><v-icon color="#132B4F" start icon="mdi-beaker-outline" class="mr-2"></v-icon>1. Matriz de Características Químicas de Entrada (Features $X$)</div>
                                         <div class="table-wrapper mb-6">
-                                            <table class="v-table v-table--density-compact" style="border-collapse: collapse;">
+                                            <table class="v-table v-table--density-compact" style="width: max-content !important;">
                                                 <thead>
                                                     <tr class="bg-grey-lighten-4">
-                                                        <th v-for="h in headersFeatures" :key="h" class="font-weight-bold text-navy text-left col-fija" style="border-bottom: 2px solid #132B4F;" v-text="h"></th>
-                                                        <th class="font-weight-bold text-navy col-accion" style="border-bottom: 2px solid #132B4F;">Acción</th>
+                                                        <th v-for="h in headersFeatures" :key="h" class="font-weight-bold text-navy text-center col-fija" style="border-bottom: 2px solid #132B4F;" v-text="h"></th>
+                                                        <th class="font-weight-bold text-navy text-center col-accion" style="border-bottom: 2px solid #132B4F;">Acción</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     <tr v-for="(row, idx) in rows" :key="idx">
-                                                        <td v-for="h in headersFeatures" :key="h" class="col-fija align-center">
-                                                            <v-text-field
-                                                                v-model="row[h]"
-                                                                density="compact"
-                                                                variant="solo-filled"
-                                                                flat
-                                                                hide-details
-                                                                class="celda-input"
-                                                            ></v-text-field>
-                                                        </td>
-                                                        <td class="col-accion">
-                                                            <v-btn icon="mdi-delete" size="x-small" color="error" variant="text" @click="removerFilaEspecifica(idx)"></v-btn>
+                                                        <td v-for="h in headersFeatures" :key="h" class="col-fija text-center"><v-text-field v-model="row[h]" density="compact" variant="solo-filled" flat hide-details class="celda-input"></v-text-field></td>
+                                                        <td class="col-accion text-center"><v-btn icon="mdi-delete" size="x-small" color="error" variant="text" @click="removerFilaEspecifica(idx)"></v-btn></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <div class="text-subtitle-2 font-weight-bold text-guinda mt-4 mb-2 d-flex align-center"><v-icon color="#8B1D2F" start icon="mdi-brain" class="mr-2"></v-icon>2. Resultados de las Predicciones Generadas</div>
+                                        <div class="table-wrapper">
+                                            <table class="v-table v-table--density-compact" style="width: max-content !important;">
+                                                <thead>
+                                                    <tr class="bg-red-lighten-5">
+                                                        <th v-for="h in headersPredictions" :key="h" class="font-weight-bold text-guinda text-center col-fija" style="border-bottom: 2px solid #8B1D2F;" v-text="h.replace('PRED_', '')"></th>
+                                                        <th class="font-weight-bold text-guinda text-center col-accion" style="border-bottom: 2px solid #8B1D2F;">Estado</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr v-for="(row, idx) in rows" :key="idx">
+                                                        <td v-for="h in headersPredictions" :key="h" class="col-fija text-center"><v-chip size="small" :color="row[h] ? '#132B4F' : 'grey-darken-1'" variant="flat" class="font-weight-bold w-100 justify-center" v-text="row[h] || 'Esperando cálculo'"></v-chip></td>
+                                                        <td class="col-accion text-center"><v-icon size="small" :color="row[headersPredictions[0]] ? 'success' : 'grey'" :icon="row[headersPredictions[0]] ? 'mdi-check-circle' : 'mdi-clock-outline'"></v-icon></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </v-card>
+                                </v-col>
+                            </v-row>
+                        </v-window-item>
+
+                        <v-window-item value="retrain">
+                            <v-row>
+                                <v-col cols="12" md="4">
+                                    <v-card class="up-card-premium pa-6" elevation="0">
+                                        <div class="text-h6 font-weight-bold text-navy mb-1">Módulo de Reentrenamiento</div>
+                                        <p class="text-caption text-grey mb-6">Modifica la malla. Al cambiar el estimador, los hiperparámetros se adaptarán de forma automática.</p>
+                                        
+                                        <v-select v-model="modeloReentrenar" :items="['Random Forest', 'XGBoost', 'Softmax Regression', 'Naive Bayes']" label="Modelo Base para Optimizar" variant="outlined" color="#132B4F" density="comfortable" class="mb-4" @update:model-value="cambiarHiperparametrosPorDefecto"></v-select>
+                                        <v-textarea v-model="grillaTextoUsuario" label="Hiperparámetros a evaluar" variant="outlined" color="#8B1D2F" rows="5" class="code-grid mt-2" hide-details></v-textarea>
+                                        
+                                        <v-btn color="#8B1D2F" variant="flat" prepend-icon="mdi-timer-flash" size="large" block class="text-capitalize mt-6 text-white" @click="ejecutarBenchmarkMallas" :loading="ejecutandoGridSearch">
+                                            Reentrenar Y Comparar Eficacia
+                                        </v-btn>
+                                    </v-card>
+                                </v-col>
+
+                                <v-col cols="12" md="8">
+                                    <v-card class="up-card-premium pa-6 mb-4" elevation="0">
+                                        <div class="text-subtitle-1 font-weight-bold text-navy mb-3"><v-icon start icon="mdi-chart-bar" color="#132B4F"></v-icon>1. Tabla Comparativa de Eficiencia en Tiempo</div>
+                                        <div class="table-wrapper mb-6" style="border: 1px solid #E1E4E8; border-radius:12px;">
+                                            <table class="v-table" style="width: 100% !important; table-layout: fixed;">
+                                                <thead>
+                                                    <tr class="bg-grey-lighten-4">
+                                                        <th class="font-weight-bold text-navy text-left pl-4" style="width: 45%; padding:12px;">Estrategia / Optimizador</th>
+                                                        <th class="font-weight-bold text-navy text-center" style="width: 30%; padding:12px;">Tiempo de Cómputo</th>
+                                                        <th class="font-weight-bold text-navy text-center" style="width: 25%; padding:12px;">Test Accuracy</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <template v-if="dataBenchmarkResp">
+                                                        <tr v-for="item in dataBenchmarkResp" :key="item.estrategia" style="border-bottom: 1px solid #E1E4E8;">
+                                                            <td class="font-weight-bold text-grey-darken-3 text-left pl-4" style="padding:12px;" v-text="item.estrategia"></td>
+                                                            <td class="text-center" style="padding:12px;">
+                                                                <v-chip size="small" :color="item.estrategia.includes('Grid') ? 'error' : (item.estrategia.includes('Random') ? 'warning' : 'success')" variant="flat" class="font-weight-bold">
+                                                                    <v-icon start icon="mdi-clock-outline" class="mr-1"></v-icon>
+                                                                    <span v-text="item.tiempo"></span>
+                                                                </v-chip>
+                                                            </td>
+                                                            <td class="text-center font-weight-bold text-navy text-body-1" style="padding:12px;" v-text="item.test_acc"></td>
+                                                        </tr>
+                                                    </template>
+                                                    <tr v-else>
+                                                        <td colspan="3" class="text-center text-grey-darken-1 py-8 text-caption" style="padding:24px;">
+                                                            <v-icon icon="mdi-information-outline" class="mr-1" color="grey"></v-icon>
+                                                            Configura la grilla a la izquierda y presiona el botón para calcular los costeos de tiempo de Optuna.
                                                         </td>
                                                     </tr>
                                                 </tbody>
                                             </table>
                                         </div>
 
-                                        <div class="text-subtitle-2 font-weight-bold text-guinda mt-4 mb-2 d-flex align-center">
-                                            <v-icon color="#8B1D2F" start icon="mdi-brain" class="mr-2"></v-icon>
-                                            2. Resultados de las Predicciones Generadas (Modelos de IA)
-                                        </div>
-                                        <div class="table-wrapper">
-                                            <table class="v-table v-table--density-compact" style="border-collapse: collapse;">
+                                        <div class="text-subtitle-1 font-weight-bold text-navy mb-3"><v-icon start icon="mdi-balance" color="#8B1D2F"></v-icon>2. Comparativa de Modelos Actuales del Pool</div>
+                                        <div class="table-wrapper" style="border: 1px solid #E1E4E8; border-radius:12px;">
+                                            <table class="v-table" style="width: 100% !important; table-layout: fixed;">
                                                 <thead>
                                                     <tr class="bg-red-lighten-5">
-                                                        <th v-for="h in headersPredictions" :key="h" class="font-weight-bold text-guinda text-left col-fija" style="border-bottom: 2px solid #8B1D2F;" v-text="h.replace('PRED_', '')"></th>
-                                                        <th class="font-weight-bold text-guinda col-accion" style="border-bottom: 2px solid #8B1D2F;">Estado</th>
+                                                        <th class="font-weight-bold text-guinda text-left pl-4" style="width: 40%; padding:12px;">Arquitectura del Sistema</th>
+                                                        <th class="font-weight-bold text-guinda text-center" style="width: 20%; padding:12px;">Train Acc</th>
+                                                        <th class="font-weight-bold text-guinda text-center" style="width: 20%; padding:12px;">Test Acc</th>
+                                                        <th class="font-weight-bold text-guinda text-center" style="width: 20%; padding:12px;">Precision</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    <tr v-for="(row, idx) in rows" :key="idx">
-                                                        <td v-for="h in headersPredictions" :key="h" class="col-fija align-center">
-                                                            <v-chip size="small" :color="row[h] ? '#132B4F' : 'grey-darken-1'" variant="flat" class="font-weight-bold w-100 justify-center" v-text="row[h] || 'Esperando cálculo'"></v-chip>
-                                                        </td>
-                                                        <td class="col-accion">
-                                                            <v-icon size="small" :color="row[headersPredictions[0]] ? 'success' : 'grey'" :icon="row[headersPredictions[0]] ? 'mdi-check-circle' : 'mdi-clock-outline'"></v-icon>
-                                                        </td>
+                                                    <template v-if="listaPoolDinamica.length">
+                                                        <tr v-for="m in listaPoolDinamica" :key="m.arquitectura" style="border-bottom: 1px solid #E1E4E8;">
+                                                            <td :class="['text-left pl-4', m.es_optimizado ? 'text-verde-premium' : 'font-weight-bold text-grey-darken-3']" style="padding:12px;"><span v-text="m.arquitectura"></span></td>
+                                                            <td :class="['text-center text-body-2', m.es_optimizado ? 'text-verde-premium' : '']" style="padding:12px;" v-text="m.train_acc"></td>
+                                                            <td :class="['text-center text-body-1', m.es_optimizado ? 'text-verde-premium' : 'font-weight-bold text-navy']" style="padding:12px;" v-text="m.test_acc"></td>
+                                                            <td :class="['text-center text-body-2', m.es_optimizado ? 'text-verde-premium' : '']" style="padding:12px;" v-text="m.precision"></td>
+                                                        </tr>
+                                                    </template>
+                                                    <tr v-else>
+                                                        <td colspan="4" class="text-center text-grey py-6" style="padding:24px;">Cargando pool de modelos del laboratorio...</td>
                                                     </tr>
                                                 </tbody>
                                             </table>
                                         </div>
-                                        
+
+                                    </v-card>
+                                </v-col>
+                            </v-row>
+                        </v-window-item>
+
+                        <v-window-item value="equipo">
+                            <v-row>
+                                <v-col cols="12" md="6" v-for="m in integrantes" :key="m.email" class="mb-2">
+                                    <v-card class="up-card-premium pa-5 border" style="border-top: 4px solid #8B1D2F !important;">
+                                        <div class="d-flex align-center justify-space-between">
+                                            <div>
+                                                <div class="text-h6 font-weight-bold text-navy" v-text="m.nombre"></div>
+                                                <div class="text-body-2 text-guinda font-weight-medium mt-1" v-text="m.email"></div>
+                                            </div>
+                                            <v-avatar color="#FAF8F6" size="52"><v-icon color="#132B4F" icon="mdi-account-school" size="28"></v-icon></v-avatar>
+                                        </div>
                                     </v-card>
                                 </v-col>
                             </v-row>
@@ -230,15 +328,114 @@
     <script src="https://cdn.jsdelivr.net/npm/vuetify@3.5.2/dist/vuetify.min.js"></script>
 
     <script>
+        // CORRECCIÓN DE PRIMARIA: Extraemos las dependencias destructuradas desde los objetos globales ya cargados
         const { createApp, ref, onMounted, nextTick } = Vue;
-        const vuetify = Vuetify.createVuetify();
+        
+        // CORRECCIÓN CRÍTICA DE SINTAXIS: Vuetify cuelga de su propia constante global en la CDN de la v3, no de Vue
+        const cuetifyInstance = Vuetify.createVuetify();
 
         createApp({
             setup() {
-                const activeTab = ref('editor');
+                const activeTab = ref('editor'); 
                 const algoritmoDim = ref('pca');
                 const mlData = ref({ modelos: {}, clases: [], puntos: [] });
                 const cargandoInferencia = ref(false);
+
+                const modeloReentrenar = ref('Random Forest');
+                const grillaTextoUsuario = ref("n_estimators: 10, 50\nmax_depth: 3, 5\ncriterion: gini, entropy");
+                const ejecutandoGridSearch = ref(false);
+                
+                const dataBenchmarkResp = ref(null);
+                const listaPoolDinamica = ref([]);
+
+                const carouselIndex = ref(0);
+                const dialogoHps = ref(false);
+                const modeloSeleccionadoHps = ref('');
+                const hpDetallesSeleccionados = ref([]);
+                const linkDocSeleccionado = ref('');
+                const linkPaperSeleccionado = ref('');
+
+                const professorName = ref("Dr. León Palafox");
+
+                const catalogoModelosExplicativos = {
+                    "Random Forest": {
+                        paper_autor: "Leo Breiman (2001) - Machine Learning Journal",
+                        descripcion: "Algoritmo de ensamble supervisado compuesto por múltiples árboles de decisión independientes (bagging). Mitiga la varianza promediando predicciones probabilísticas.",
+                        fortalezas: "Resistente a valores atípicos y excelente mapeo de fronteras no lineales complejas.",
+                        link_doc: "https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html",
+                        link_paper: "https://link.springer.com/article/10.1023/A:1010933404324",
+                        hps: [
+                            { param: "n_estimators", rango: "Rango sugerido: 50 a 500 [Entero]", def: "Cantidad total de árboles de decisión independientes a instanciar en el ensamble." },
+                            { param: "max_depth", rango: "Rango: 3 a 20 o None [Entero]", def: "Límite máximo de ramificaciones jerárquicas verticales permitidas en cada árbol del bosque." },
+                            { param: "criterion", rango: "Opciones: 'gini', 'entropy', 'log_loss'", def: "Función matemática para cuantificar la impureza o ganancia de información en cada split." },
+                            { param: "min_samples_split", rango: "Rango: 2 a 12 [Entero]", def: "Muestras mínimas requeridas en un nodo interno para permitir una nueva división divisional." },
+                            { param: "min_samples_leaf", rango: "Rango: 1 a 10 [Entero]", def: "Cantidad mínima de observaciones que deben quedar retenidas al final de una hoja terminal." },
+                            { param: "max_features", rango: "Opciones: 'sqrt', 'log2', None", def: "Subconjunto aleatorio de variables analizadas al buscar la partición óptima de un nodo." },
+                            { param: "bootstrap", rango: "Boolean: True o False", def: "Determina si el entrenamiento de cada árbol utiliza muestreo con reemplazo continuo." },
+                            { param: "max_samples", rango: "Rango: 0.1 a 1.0 o None [Flotante]", def: "Porcentaje del dataset original a extraer si bootstrap está activado." },
+                            { param: "ccp_alpha", rango: "Rango: 0.0 a 0.05 [Flotante]", def: "Umbral de complejidad de costo para aplicar poda (Pruning) a subárboles redundantes." }
+                        ]
+                    },
+                    "XGBoost": {
+                        paper_autor: "Tianqi Chen & Carlos Guestrin (2016) - ACM KDD Conference",
+                        descripcion: "Implementación ultra optimizada y regularizada de Gradient Boosting. Ajusta árboles secuenciales minimizando los residuos mediante una aproximación de Taylor de segundo orden.",
+                        fortalezas: "Ultra veloz, paralelizable y con regularización L1/L2 nativa para evitar sobreajuste.",
+                        link_doc: "https://xgboost.readthedocs.io/en/stable/python/python_api.html#xgboost.XGBClassifier",
+                        link_paper: "https://arxiv.org/abs/1603.02754",
+                        hps: [
+                            { param: "n_estimators", rango: "Rango sugerido: 50 a 300 [Entero]", def: "Cantidad total de etapas secuenciales de boosting o árboles correctores a ajustar." },
+                            { param: "learning_rate", rango: "Rango: 0.01 a 0.3 (eta) [Flotante]", def: "Paso de aprendizaje que reduce la magnitud de la corrección de cada árbol." },
+                            { param: "max_depth", rango: "Rango: 2 a 10 [Entero]", def: "Profundidad máxima permitida por árbol corrector para prevenir sobreajuste estructural." },
+                            { param: "subsample", rango: "Rango: 0.5 a 1.0 [Flotante]", def: "Porcentaje de instancias a muestrear aleatoriamente antes de construir una nueva etapa." },
+                            { param: "colsample_bytree", rango: "Rango: 0.5 a 1.0 [Flotante]", def: "Fracción de variables a extraer aleatoriamente al construir cada árbol individual." },
+                            { param: "reg_alpha", rango: "Rango: 0.0 a 10.0 (L1) [Flotante]", def: "Término de regularización Lasso sobre las hojas del modelo." },
+                            { param: "reg_lambda", rango: "Rango: 0.0 a 10.0 (L2) [Flotante]", def: "Término de regularización Ridge sobre las hojas del modelo." },
+                            { param: "gamma", rango: "Rango: 0.0 a 5.0 [Flotante]", def: "Pérdida mínima requerida para realizar una partición adicional en un nodo del árbol." },
+                            { param: "min_child_weight", rango: "Rango: 1 a 10 [Entero]", def: "Suma mínima de la ponderación de las instancias (Hessiano) necesaria en un nodo hijo." }
+                        ]
+                    },
+                    "Softmax Regression": {
+                        paper_autor: "David Cox (1958) - Journal of the Royal Statistical Society",
+                        descripcion: "Generalización multinomial de la regresión logística para problemas de clasificación multiclase. Utiliza una normalización exponencial (Softmax) para mapear combinaciones lineales a probabilidades.",
+                        fortalezas: "Máxima velocidad de convergencia, alta estabilidad matemática e interpretación directa de pesos.",
+                        link_doc: "https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html",
+                        link_paper: "https://www.jstor.org/stable/2983890",
+                        hps: [
+                            { param: "C", rango: "Rango sugerido: 0.01 a 50.0 [Flotante]", def: "Inversa de la fuerza de regularización. Valores pequeños incrementan la penalización." },
+                            { param: "penalty", rango: "Opciones: 'l1', 'l2', 'elasticnet', None", def: "Norma geométrica aplicada para penalizar los coeficientes de la ecuación lineal." },
+                            { param: "solver", rango: "Opciones: 'lbfgs', 'saga', 'newton-cg'", def: "Algoritmo de optimización numérica para converger la función de costo log-loss." },
+                            { param: "max_iter", rango: "Rango: 100 a 2000 [Entero]", def: "Número máximo de iteraciones otorgadas al solver para alcanzar la convergencia." },
+                            { param: "tol", rango: "Rango: 1e-5 a 1e-3 [Flotante]", def: "Tolerancia de parada mínima exigida para detener las iteraciones de optimización." },
+                            { param: "multi_class", rango: "Opciones: 'multinomial', 'ovr', 'auto'", def: "Estrategia matemática para modelar las fronteras entre múltiples clases." },
+                            { param: "l1_ratio", rango: "Rango: 0.0 a 1.0 [Flotante]", def: "Balance de mezcla ElasticNet (activo únicamente si penalty='elasticnet')." }
+                        ]
+                    },
+                    "Naive Bayes": {
+                        paper_autor: "Thomas Bayes (1763) - Philosophical Transactions of the Royal Society",
+                        descripcion: "Clasificador Probabilístico Gaussiano. Asume de forma estricta que todas las variables de entrada químicas son independientes entre sí dadas las clases del vino.",
+                        fortalezas: "No requiere optimización iterativa por gradiente, es inmune al sobreajuste por ruido y es ultra ligero.",
+                        link_doc: "https://scikit-learn.org/stable/modules/generated/sklearn.naive_bayes.GaussianNB.html",
+                        link_paper: "https://royalsocietypublishing.org/doi/10.1098/rstl.1763.0053",
+                        hps: [
+                            { param: "var_smoothing", rango: "Rango sugerido: 1e-11 a 1e-3 [Flotante]", def: "Porción de la varianza máxima de todas las características que se añade de forma artificial para suavizar las campanas gaussianas en probabilidades nulas." }
+                        ]
+                    }
+                };
+
+                const auditarHiperparametrosModelo = (modelo) => {
+                    modeloSeleccionadoHps.value = modelo;
+                    hpDetallesSeleccionados.value = catalogoModelosExplicativos[modelo].hps;
+                    linkDocSeleccionado.value = catalogoModelosExplicativos[modelo].link_doc;
+                    linkPaperSeleccionado.value = catalogoModelosExplicativos[modelo].link_paper;
+                    dialogoHps.value = true;
+                };
+
+                const grillasSugeridasPorModelo = {
+                    "Random Forest": "n_estimators: 10, 50\nmax_depth: 3, 5\ncriterion: gini, entropy",
+                    "XGBoost": "n_estimators: 20, 50\nmax_depth: 2, 4\nlearning_rate: 0.1, 0.2",
+                    "Softmax Regression": "C: 0.1, 1.0\ntol: 0.0001, 0.001",
+                    "Naive Bayes": "var_smoothing: 1e-9, 1e-7"
+                };
 
                 const headersFeatures = ref([
                     'alcohol', 'malic_acid', 'ash', 'alcalinity_of_ash', 'magnesium', 
@@ -267,15 +464,52 @@
                     { nombre: 'Oscar Barranco Velázquez', email: '0287244@up.edu.mx' }
                 ];
 
+                const cambiarHiperparametrosPorDefecto = (nuevoModelo) => {
+                    grillaTextoUsuario.value = grillasSugeridasPorModelo[nuevoModelo];
+                };
+
                 const cargarPipelineML = async () => {
                     try {
                         const res = await fetch('/api/ml-results');
                         mlData.value = await res.json();
+                        
+                        listaPoolDinamica.value = Object.keys(mlData.value.modelos).map(name => ({
+                            arquitectura: name,
+                            train_acc: mlData.value.modelos[name].train_acc,
+                            test_acc: mlData.value.modelos[name].test_acc,
+                            precision: mlData.value.modelos[name].precision,
+                            es_optimizado: mlData.value.modelos[name].es_optimizado || false
+                        }));
+
                         if (activeTab.value === 'proyecciones') {
                             dibujarGrafico();
                         }
                     } catch (err) {
                         console.error("Fallo al conectar pipeline ML:", err);
+                    }
+                };
+
+                const ejecutarBenchmarkMallas = async () => {
+                    ejecutandoGridSearch.value = true;
+                    dataBenchmarkResp.value = null;
+                    try {
+                        const res = await fetch('/api/retrain', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                model: modeloReentrenar.value,
+                                grid_text: grillaTextoUsuario.value
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.status === 'ok') {
+                            dataBenchmarkResp.value = data.benchmark_lista;
+                            listaPoolDinamica.value = data.pool_lista;
+                        }
+                    } catch (e) {
+                        console.error("Error en mallas:", e);
+                    } finally {
+                        ejecutandoGridSearch.value = false;
                     }
                 };
 
@@ -286,12 +520,10 @@
                     rows.value.push(nuevaFila);
                 };
 
-                // ACCIÓN DE REMOVER REGISTRO: Elimina de forma simétrica la fila en ambas vistas basándose en su índice
-                const removerFilaEspecifica = (indice) => {
+                const removerFilaEspecifica = (idx) => {
                     if (rows.value.length > 1) {
-                        rows.value.splice(indice, 1);
+                        rows.value.splice(idx, 1);
                     } else {
-                        // Si es la última fila que queda, en lugar de romper el layout, la reiniciamos a ceros
                         headersFeatures.value.forEach(h => rows.value[0][h] = '0.0');
                         headersPredictions.value.forEach(p => rows.value[0][p] = '');
                     }
@@ -306,7 +538,6 @@
                             body: JSON.stringify({ rows: rows.value })
                         });
                         const resultado = await res.json();
-                        
                         if (resultado.status === 'ok') {
                             rows.value = resultado.rows.map((newRow, idx) => {
                                 const filaPreservada = rows.value[idx] ? { ...rows.value[idx] } : { ...newRow };
@@ -326,14 +557,11 @@
                 const enviarCSVAlServidor = async (fileObj) => {
                     if (!fileObj) return;
                     const archivo = Array.isArray(fileObj) ? fileObj[0] : fileObj;
-                    
                     const dataForm = new FormData();
                     dataForm.append('file', archivo);
-
                     try {
                         const res = await fetch('/api/upload-csv', { method: 'POST', body: dataForm });
                         const resultado = await res.json();
-                        
                         if (resultado.status === 'ok') {
                             rows.value = resultado.rows;
                         }
@@ -371,7 +599,6 @@
                     if (!mlData.value.puntos || !mlData.value.puntos.length) return;
                     const pts = mlData.value.puntos;
                     const key = algoritmoDim.value;
-
                     const traces = mlData.value.clases.map((c, i) => {
                         const sub = pts.filter(p => p.clase === c);
                         const colores = ['#132B4F', '#8B1D2F', '#D4AF37'];
@@ -383,7 +610,6 @@
                             marker: { size: 10, color: colores[i], opacity: 0.85 }
                         };
                     });
-
                     Plotly.newPlot('plotly-chart-area', traces, {
                         paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
                         margin: { l: 40, r: 10, b: 40, t: 10 },
@@ -400,9 +626,9 @@
 
                 onMounted(cargarPipelineML);
 
-                return { activeTab, algoritmoDim, mlData, integrantes, headersFeatures, headersPredictions, rows, cargandoInferencia, agregarFilaVacia, removerFilaEspecifica, procesarInferenciaManual, enviarCSVAlServidor, descargarSoloPlantillaFeatures, descargarPrediccionesCompletas, dibujarGrafico, manejarCambioTab };
+                return { activeTab, algoritmoDim, mlData, integrantes, headersFeatures, headersPredictions, rows, cargandoInferencia, modeloReentrenar, grillaTextoUsuario, ejecutandoGridSearch, dataBenchmarkResp, listaPoolDinamica, cambiarHiperparametrosPorDefecto, ejecutarBenchmarkMallas, agregarFilaVacia, removerFilaEspecifica, procesarInferenciaManual, enviarCSVAlServidor, descargarSoloPlantillaFeatures, descargarPrediccionesCompletas, dibujarGrafico, manejarCambioTab, carouselIndex, dialogoHps, modeloSeleccionadoHps, hpDetallesSeleccionados, catalogoModelosExplicativos, auditarHiperparametrosModelo, professorName, linkDocSeleccionado, linkPaperSeleccionado };
             }
-        }).use(vuetify).mount('#app');
+        }).use(cuetifyInstance).mount('#app'); // Montamos usando la instancia nativa 'cuetifyInstance' inyectada arriba
     </script>
 </body>
 </html>
