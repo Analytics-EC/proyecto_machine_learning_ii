@@ -5,6 +5,7 @@ import io
 import sys
 import time
 import optuna
+
 from sklearn.datasets import load_wine
 from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV, cross_val_score
 from sklearn.preprocessing import StandardScaler
@@ -15,7 +16,14 @@ from xgboost import XGBClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+from sklearn.inspection import permutation_importance, partial_dependence
 import umap
+
+# Intentar importar SHAP de forma segura
+try:
+    import shap
+except ImportError:
+    shap = None
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
@@ -79,16 +87,6 @@ def inicializar_entorno_ia():
 
 CACHED_DATA = inicializar_entorno_ia()
 
-def evaluar_tipo_estricto(v_str):
-    v = v_str.strip()
-    if v.lower() == 'true': return True
-    if v.lower() == 'false': return False
-    try:
-        if 'e' in v.lower() or '.' in v: return float(v)
-        return int(v)
-    except ValueError:
-        return v
-
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -96,6 +94,108 @@ def index():
 @app.route("/api/ml-results")
 def get_ml_results():
     return jsonify(CACHED_DATA)
+
+# 1. API NUEVA: CALCULAR IMPORTANCIA POR PERMUTACIONES (CON SU RESPECTIVA DESVIACIÓN)
+@app.route("/api/xai/permutation", methods=["POST"])
+def get_permutation_importance():
+    try:
+        req = request.get_json()
+        name = req.get("model", "Random Forest")
+        model = MODELOS_POOL.get(name)
+        
+        if not model:
+            return jsonify({"status": "error", "message": "Modelo no encontrado"}), 400
+            
+        r = permutation_importance(model, X_TEST_SCALED, Y_TEST, n_repeats=5, random_state=42, n_jobs=-1)
+        
+        lista_importancias = []
+        for idx, feat in enumerate(FEATURES_ML):
+            lista_importancias.append({
+                "feature": feat,
+                "importance_mean": float(r.importances_mean[idx]),
+                "importance_std": float(r.importances_std[idx])
+            })
+            
+        # Ordenar de mayor a menor impacto predictivo
+        lista_importancias = sorted(lista_importancias, key=lambda x: x["importance_mean"], reverse=True)
+        return jsonify({"status": "ok", "permutations": lista_importancias})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# 2. API NUEVA: CALCULAR PDP E ICE PLOTS PARA UNA VARIABLE SELECCIONADA
+@app.route("/api/xai/pdp-ice", methods=["POST"])
+def get_pdp_ice_data():
+    try:
+        req = request.get_json()
+        model_name = req.get("model", "Random Forest")
+        feature_name = req.get("feature", "alcohol")
+        
+        model = MODELOS_POOL.get(model_name)
+        if not model or feature_name not in FEATURES_ML:
+            return jsonify({"status": "error", "message": "Parámetros inválidos"}), 400
+            
+        feat_idx = FEATURES_ML.index(feature_name)
+        
+        # Calcular Dependencia Parcial e ICE combinado usando Scikit-Learn
+        pdp_res = partial_dependence(model, X_TRAIN_SCALED, features=[feat_idx], kind="both", grid_resolution=25)
+        
+        grid_values = pdp_res["grid_values"][0].tolist()
+        pdp_values = pdp_res["average"][0].tolist()  # La curva promedio (PDP)
+        ice_lines = pdp_res["individual"][0].tolist()  # Las curvas individuales (ICE, máximo 30 para no saturar)
+        
+        return jsonify({
+            "status": "ok",
+            "grid": grid_values,
+            "pdp": pdp_values,
+            "ice": ice_lines[:30] 
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# 3. API NUEVA: MATRICES DE EXPLICABILIDAD ADAPTATIVA SHAP PARA GRÁFICOS INTERACTIVOS
+@app.route("/api/xai/shap", methods=["POST"])
+def get_shap_values():
+    try:
+        req = request.get_json()
+        model_name = req.get("model", "Random Forest")
+        model = MODELOS_POOL.get(model_name)
+        
+        if not model:
+            return jsonify({"status": "error", "message": "Modelo inválido"}), 400
+            
+        # Muestreo seguro de 60 registros para evitar latencia de renderizado
+        X_sample = X_TEST_SCALED[:60]
+        
+        # Enrutador inteligente de explicadores SHAP basados en la naturaleza del modelo
+        if "Random Forest" in model_name or "XGBoost" in model_name:
+            explainer = shap.TreeExplainer(model)
+            shap_values = explainer.shap_values(X_sample)
+        else:
+            # KernelExplainer agnóstico y robusto para Naive Bayes y Logística multinomial
+            pred_func = model.predict_proba
+            explainer = shap.KernelExplainer(pred_func, shap.kmeans(X_TRAIN_SCALED, 5))
+            shap_values = explainer.shap_values(X_sample)
+
+        # Homogeneizar dimensiones para clasificadores multiclase (Vino tiene 3 clases, tomamos Clase 1)
+        if isinstance(shap_values, list):
+            vals = np.array(shap_values[1])
+        elif len(shap_values.shape) == 3:
+            vals = shap_values[:, :, 1]
+        else:
+            vals = np.array(shap_values)
+
+        # Emparejar matrices completas para reconstruir Importance, Beeswarm y Dependencia en el cliente
+        matriz_shap = vals.tolist()
+        valores_reales = X_sample.tolist()
+        
+        return jsonify({
+            "status": "ok",
+            "features": FEATURES_ML,
+            "shap_values": matriz_shap,
+            "real_values": valores_reales
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/api/retrain", methods=["POST"])
 def retrain_and_benchmark():
@@ -197,35 +297,39 @@ def retrain_and_benchmark():
             "test_acc": f"{accuracy_score(Y_TEST, opt_clf.predict(X_TEST_SCALED))*100:.2f}%"
         })
 
-        # CLONACIÓN DEL MODELO: En lugar de reemplazar el viejo, añadimos el optimizado al diccionario
         nombre_optimizado = f"{modelo_seleccionado} (Optimizado)"
         MODELOS_POOL[nombre_optimizado] = gs.best_estimator_
         
         y_pred = gs.best_estimator_.predict(X_TEST_SCALED)
         y_train_pred = gs.best_estimator_.predict(X_TRAIN_SCALED)
         
-        # Guardamos estadísticas bajo la nueva llave del pool sin pisar el modelo base original
         CACHED_DATA["modelos"][nombre_optimizado] = {
             "train_acc": f"{accuracy_score(Y_TRAIN, y_train_pred)*100:.2f}%",
             "test_acc": resultados_lista[0]["test_acc"],
             "precision": f"{precision_score(Y_TEST, y_pred, average='macro')*100:.2f}%",
             "recall": f"{recall_score(Y_TEST, y_pred, average='macro')*100:.2f}%",
-            "es_optimizado": True  # Flag para pintar las letras verdes en el frontend
+            "es_optimizado": True
         }
 
         pool_convertido_lista = []
         for name, stats in CACHED_DATA["modelos"].items():
             pool_convertido_lista.append({
-                "arquitectura": name,
-                "train_acc": stats["train_acc"],
-                "test_acc": stats["test_acc"],
-                "precision": stats["precision"],
-                "es_optimizado": stats.get("es_optimizado", False)
+                "arquitectura": name, "train_acc": stats["train_acc"], "test_acc": stats["test_acc"], "precision": stats["precision"], "es_optimizado": stats.get("es_optimizado", False)
             })
 
         return jsonify({"status": "ok", "benchmark_lista": resultados_lista, "pool_lista": pool_convertido_lista})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+def evaluar_tipo_estricto(v_str):
+    v = v_str.strip()
+    if v.lower() == 'true': return True
+    if v.lower() == 'false': return False
+    try:
+        if 'e' in v.lower() or '.' in v: return float(v)
+        return int(v)
+    except ValueError:
+        return v
 
 @app.route("/api/predict-table", methods=["POST"])
 def predict_table():

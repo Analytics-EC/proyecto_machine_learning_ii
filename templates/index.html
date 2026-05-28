@@ -34,7 +34,7 @@
             
             <div class="up-navbar pa-4 d-flex align-center justify-space-between flex-wrap">
                 <div class="d-flex align-center">
-                    <v-img src="{{ url_for('static', filename='logo_up.png') }}" max-height="175" style="width: 240px; min-width: 240px;" class="mr-6"></v-img>
+                    <v-img src="{{ url_for('static', filename='logo_up.png') }}" max-height="65" style="width: 240px; min-width: 240px;" class="mr-6"></v-img>
                     <div>
                         <h1 class="text-h4 font-weight-bold text-navy" style="font-family: 'Montserrat', sans-serif; letter-spacing: -0.5px;">
                             Laboratorio de Machine Learning 2
@@ -46,6 +46,7 @@
                 <v-tabs v-model="activeTab" color="#8B1D2F" @update:model-value="manejarCambioTab">
                     <v-tab value="proyecciones"><v-icon start icon="mdi-chart-scatter-plot"></v-icon>Proyecciones</v-tab>
                     <v-tab value="modelos"><v-icon start icon="mdi-brain"></v-icon>Catálogo Académico</v-tab>
+                    <v-tab value="xai"><v-icon start icon="mdi-eye-outline"></v-icon>Explicabilidad (XAI)</v-tab>
                     <v-tab value="editor"><v-icon start icon="mdi-table-edit"></v-icon>Módulo de Inferencia (.csv)</v-tab>
                     <v-tab value="retrain"><v-icon start icon="mdi-gauge"></v-icon>Optimización (Optuna)</v-tab>
                     <v-tab value="equipo"><v-icon start icon="mdi-account-group"></v-icon>Equipo</v-tab>
@@ -126,7 +127,6 @@
                                         <v-btn icon="mdi-close" variant="text" size="small" @click="dialogoHps = false"></v-btn>
                                     </v-card-title>
                                     <v-divider class="my-2"></v-divider>
-                                    
                                     <v-card-text style="max-height: 440px;">
                                         <div v-for="p in hpDetallesSeleccionados" :key="p.param" class="mb-4 bg-grey-lighten-4 pa-3 rounded-lg border">
                                             <div class="d-flex align-center justify-space-between mb-1">
@@ -136,24 +136,69 @@
                                             <div class="text-body-2 text-grey-darken-3 mt-1"><strong>Definición Técnica:</strong> <span v-text="p.def"></span></div>
                                         </div>
                                     </v-card-text>
-                                    
                                     <v-divider class="mt-2"></v-divider>
                                     <v-card-actions class="pt-3">
                                         <v-row>
-                                            <v-col cols="6">
-                                                <v-btn color="#132B4F" variant="flat" block class="text-capitalize font-weight-bold text-white" :href="linkDocSeleccionado" target="_blank">
-                                                    <v-icon start icon="mdi-api"></v-icon> API Documentación
-                                                </v-btn>
-                                            </v-col>
-                                            <v-col cols="6">
-                                                <v-btn color="#8B1D2F" variant="flat" block class="text-capitalize font-weight-bold text-white" :href="linkPaperSeleccionado" target="_blank">
-                                                    <v-icon start icon="mdi-file-certificate"></v-icon> Ver Paper Científico
-                                                </v-btn>
-                                            </v-col>
+                                            <v-col cols="6"><v-btn color="#132B4F" variant="flat" block class="text-capitalize font-weight-bold text-white" :href="linkDocSeleccionado" target="_blank"><v-icon start icon="mdi-api"></v-icon> API Documentación</v-btn></v-col>
+                                            <v-col cols="6"><v-btn color="#8B1D2F" variant="flat" block class="text-capitalize font-weight-bold text-white" :href="linkPaperSeleccionado" target="_blank"><v-icon start icon="mdi-file-certificate"></v-icon> Ver Paper Científico</v-btn></v-col>
                                         </v-row>
                                     </v-card-actions>
                                 </v-card>
                             </v-dialog>
+                        </v-window-item>
+
+                        <v-window-item value="xai">
+                            <v-row>
+                                <v-col cols="12" md="4">
+                                    <v-card class="up-card-premium pa-6" elevation="0">
+                                        <div class="text-h6 font-weight-bold text-navy mb-1">Centro de Explicabilidad</div>
+                                        <p class="text-caption text-grey mb-6">Selecciona el estimador y la variable para auditar el comportamiento e impacto global.</p>
+                                        
+                                        <v-select v-model="modeloSeleccionadoXAI" :items="['Random Forest', 'XGBoost', 'Naive Bayes', 'Softmax Regression']" label="Arquitectura de Análisis" variant="outlined" color="#132B4F" density="comfortable" class="mb-4" @update:model-value="calcularPipelineCompletoXAI"></v-select>
+                                        <v-select v-model="featureSeleccionadaXAI" :items="headersFeatures" label="Variable Química (PDP / ICE)" variant="outlined" color="#8B1D2F" density="comfortable" class="mb-4" @update:model-value="calcularParcialDependenceXAI"></v-select>
+                                        
+                                        <v-divider class="my-4"></v-divider>
+                                        
+                                        <div class="text-subtitle-2 font-weight-bold text-navy mb-2">Glosario de Métricas Teóricas:</div>
+                                        <div class="text-caption text-grey-darken-3 mb-2"><strong>Permutation Importance:</strong> Mide la caída del Accuracy al barajar una variable. Las barras de error muestran la estabilidad en 5 repeticiones.</div>
+                                        <div class="text-caption text-grey-darken-3 mb-2"><strong>PDP (Curva Azul):</strong> Muestra el impacto marginal promedio de la variable sobre la probabilidad de la clase de vino.</div>
+                                        <div class="text-caption text-grey-darken-3"><strong>ICE (Líneas Grises):</strong> Muestran la heterogeneidad de las predicciones fila por fila para capturar efectos de interacción.</div>
+                                    </v-card>
+                                </v-col>
+
+                                <v-col cols="12" md="8">
+                                    <v-row>
+                                        <v-col cols="12" sm="6">
+                                            <v-card class="up-card-premium pa-4" elevation="0">
+                                                <div class="text-subtitle-2 font-weight-bold text-navy mb-2"><v-icon start icon="mdi-matrix" color="#132B4F"></v-icon> Permutation Importance (5 Repeticiones)</div>
+                                                <div id="chart-permutation-importance" style="width:100%; height:320px;"></div>
+                                            </v-card>
+                                        </v-col>
+                                        <v-col cols="12" sm="6">
+                                            <v-card class="up-card-premium pa-4" elevation="0">
+                                                <div class="text-subtitle-2 font-weight-bold text-navy mb-2"><v-icon start icon="mdi-chart-bell-curve" color="#8B1D2F"></v-icon> PDP & ICE: <span v-text="featureSeleccionadaXAI"></span></div>
+                                                <div id="chart-pdp-ice" style="width:100%; height:320px;"></div>
+                                            </v-card>
+                                        </v-col>
+                                    </v-row>
+
+                                    <v-row class="mt-2">
+                                        <v-col cols="12">
+                                            <v-card class="up-card-premium pa-4" elevation="0">
+                                                <div class="d-flex justify-space-between align-center mb-2 flex-wrap">
+                                                    <div class="text-subtitle-2 font-weight-bold text-navy"><v-icon start icon="mdi-eye" color="#2E7D32"></v-icon> Análisis de Contribución de SHAP Values</div>
+                                                    <v-btn-toggle v-model="tipoVisualizacionSHAP" mandatory color="#2E7D32" variant="tonal" rounded="lg" @update:model-value="renderizarGraficosSHAP">
+                                                        <v-btn value="barras" size="small">Global Importance</v-btn>
+                                                        <v-btn value="beeswarm" size="small">Beeswarm Density</v-btn>
+                                                        <v-btn value="dependencia" size="small">Dependencia SHAP</v-btn>
+                                                    </v-btn-toggle>
+                                                </div>
+                                                <div id="chart-shap-workspace" style="width:100%; height:340px;"></div>
+                                            </v-card>
+                                        </v-col>
+                                    </v-row>
+                                </v-col>
+                            </v-row>
                         </v-window-item>
 
                         <v-window-item value="editor">
@@ -165,18 +210,10 @@
                                         <v-file-input label="Cargar archivo .csv" variant="outlined" color="#8B1D2F" density="comfortable" prepend-icon="mdi-cloud-upload" @update:model-value="enviarCSVAlServidor" class="mb-2"></v-file-input>
                                         
                                         <v-row class="mb-4 mt-2">
-                                            <v-col cols="12" sm="6" md="3">
-                                                <v-btn color="success" variant="flat" prepend-icon="mdi-plus" block class="text-capitalize font-weight-bold" @click="agregarFilaVacia">Añadir Fila</v-btn>
-                                            </v-col>
-                                            <v-col cols="12" sm="6" md="3">
-                                                <v-btn color="#132B4F" variant="flat" prepend-icon="mdi-file-table-outline" block class="text-capitalize text-white font-weight-bold" @click="descargarSoloPlantillaFeatures">Plantilla Base (X)</v-btn>
-                                            </v-col>
-                                            <v-col cols="12" sm="6" md="3">
-                                                <v-btn color="grey-darken-3" variant="flat" prepend-icon="mdi-download" block class="text-capitalize font-weight-bold" @click="descargarPrediccionesCompletas">Exportar Predicciones</v-btn>
-                                            </v-col>
-                                            <v-col cols="12" sm="6" md="3">
-                                                <v-btn color="#8B1D2F" variant="flat" prepend-icon="mdi-calculator" block class="text-capitalize font-weight-bold" @click="procesarInferenciaManual" :loading="cargandoInferencia">Calcular Inferencia</v-btn>
-                                            </v-col>
+                                            <v-col cols="12" sm="6" md="3"><v-btn color="success" variant="flat" prepend-icon="mdi-plus" block class="text-capitalize font-weight-bold" @click="agregarFilaVacia">Añadir Fila</v-btn></v-col>
+                                            <v-col cols="12" sm="6" md="3"><v-btn color="#132B4F" variant="flat" prepend-icon="mdi-file-table-outline" block class="text-capitalize text-white font-weight-bold" @click="descargarSoloPlantillaFeatures">Plantilla Base (X)</v-btn></v-col>
+                                            <v-col cols="12" sm="6" md="3"><v-btn color="grey-darken-3" variant="flat" prepend-icon="mdi-download" block class="text-capitalize font-weight-bold" @click="descargarPrediccionesCompletas">Exportar Predicciones</v-btn></v-col>
+                                            <v-col cols="12" sm="6" md="3"><v-btn color="#8B1D2F" variant="flat" prepend-icon="mdi-calculator" block class="text-capitalize font-weight-bold" @click="procesarInferenciaManual" :loading="cargandoInferencia">Calcular Inferencia</v-btn></v-col>
                                         </v-row>
 
                                         <div class="text-subtitle-2 font-weight-bold text-navy mt-4 mb-2 d-flex align-center"><v-icon color="#132B4F" start icon="mdi-beaker-outline" class="mr-2"></v-icon>1. Matriz de Características Químicas de Entrada (Features $X$)</div>
@@ -229,7 +266,7 @@
                                         <v-select v-model="modeloReentrenar" :items="['Random Forest', 'XGBoost', 'Softmax Regression', 'Naive Bayes']" label="Modelo Base para Optimizar" variant="outlined" color="#132B4F" density="comfortable" class="mb-4" @update:model-value="cambiarHiperparametrosPorDefecto"></v-select>
                                         <v-textarea v-model="grillaTextoUsuario" label="Hiperparámetros a evaluar" variant="outlined" color="#8B1D2F" rows="5" class="code-grid mt-2" hide-details></v-textarea>
                                         
-                                        <v-btn color="#8B1D2F" variant="flat" prepend-icon="mdi-timer-flash" size="large" block class="text-capitalize mt-6 text-white" @click="ejecutarBenchmarkMallas" :loading="ejecutandoGridSearch">
+                                        <v-btn color="#8B1D2F" variant="flat" prepend-icon="mdi-timer-flash" size="large" block class="text-capitalize mt-6 text-white font-weight-bold" @click="ejecutarBenchmarkMallas" :loading="ejecutandoGridSearch">
                                             Reentrenar Y Comparar Eficacia
                                         </v-btn>
                                     </v-card>
@@ -237,31 +274,33 @@
 
                                 <v-col cols="12" md="8">
                                     <v-card class="up-card-premium pa-6 mb-4" elevation="0">
+                                        
                                         <div class="text-subtitle-1 font-weight-bold text-navy mb-3"><v-icon start icon="mdi-chart-bar" color="#132B4F"></v-icon>1. Tabla Comparativa de Eficiencia en Tiempo</div>
+                                        
                                         <div class="table-wrapper mb-6" style="border: 1px solid #E1E4E8; border-radius:12px;">
-                                            <table class="v-table" style="width: 100% !important; table-layout: fixed;">
+                                            <table class="v-table v-table--density-compact" style="width: max-content !important; border-collapse: collapse;">
                                                 <thead>
                                                     <tr class="bg-grey-lighten-4">
-                                                        <th class="font-weight-bold text-navy text-left pl-4" style="width: 45%; padding:12px;">Estrategia / Optimizador</th>
-                                                        <th class="font-weight-bold text-navy text-center" style="width: 30%; padding:12px;">Tiempo de Cómputo</th>
-                                                        <th class="font-weight-bold text-navy text-center" style="width: 25%; padding:12px;">Test Accuracy</th>
+                                                        <th class="font-weight-bold text-navy text-left col-fija" style="border-bottom: 2px solid #132B4F;">Estrategia / Optimizador</th>
+                                                        <th class="font-weight-bold text-navy text-center col-fija" style="border-bottom: 2px solid #132B4F;">Tiempo de Cómputo</th>
+                                                        <th class="font-weight-bold text-navy text-center col-fija" style="border-bottom: 2px solid #132B4F;">Test Accuracy</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     <template v-if="dataBenchmarkResp">
-                                                        <tr v-for="item in dataBenchmarkResp" :key="item.estrategia" style="border-bottom: 1px solid #E1E4E8;">
-                                                            <td class="font-weight-bold text-grey-darken-3 text-left pl-4" style="padding:12px;" v-text="item.estrategia"></td>
-                                                            <td class="text-center" style="padding:12px;">
+                                                        <tr v-for="item in dataBenchmarkResp" :key="item.estrategia">
+                                                            <td class="font-weight-bold text-grey-darken-3 text-left col-fija" v-text="item.estrategia"></td>
+                                                            <td class="text-center col-fija">
                                                                 <v-chip size="small" :color="item.estrategia.includes('Grid') ? 'error' : (item.estrategia.includes('Random') ? 'warning' : 'success')" variant="flat" class="font-weight-bold">
                                                                     <v-icon start icon="mdi-clock-outline" class="mr-1"></v-icon>
                                                                     <span v-text="item.tiempo"></span>
                                                                 </v-chip>
                                                             </td>
-                                                            <td class="text-center font-weight-bold text-navy text-body-1" style="padding:12px;" v-text="item.test_acc"></td>
+                                                            <td class="text-center font-weight-bold text-navy text-body-1 col-fija" v-text="item.test_acc"></td>
                                                         </tr>
                                                     </template>
                                                     <tr v-else>
-                                                        <td colspan="3" class="text-center text-grey-darken-1 py-8 text-caption" style="padding:24px;">
+                                                        <td colspan="3" class="text-center text-grey-darken-1 py-8 text-caption col-fija">
                                                             <v-icon icon="mdi-information-outline" class="mr-1" color="grey"></v-icon>
                                                             Configura la grilla a la izquierda y presiona el botón para calcular los costeos de tiempo de Optuna.
                                                         </td>
@@ -271,27 +310,28 @@
                                         </div>
 
                                         <div class="text-subtitle-1 font-weight-bold text-navy mb-3"><v-icon start icon="mdi-balance" color="#8B1D2F"></v-icon>2. Comparativa de Modelos Actuales del Pool</div>
+                                        
                                         <div class="table-wrapper" style="border: 1px solid #E1E4E8; border-radius:12px;">
-                                            <table class="v-table" style="width: 100% !important; table-layout: fixed;">
+                                            <table class="v-table v-table--density-compact" style="width: max-content !important; border-collapse: collapse;">
                                                 <thead>
                                                     <tr class="bg-red-lighten-5">
-                                                        <th class="font-weight-bold text-guinda text-left pl-4" style="width: 40%; padding:12px;">Arquitectura del Sistema</th>
-                                                        <th class="font-weight-bold text-guinda text-center" style="width: 20%; padding:12px;">Train Acc</th>
-                                                        <th class="font-weight-bold text-guinda text-center" style="width: 20%; padding:12px;">Test Acc</th>
-                                                        <th class="font-weight-bold text-guinda text-center" style="width: 20%; padding:12px;">Precision</th>
+                                                        <th class="font-weight-bold text-guinda text-left col-fija" style="border-bottom: 2px solid #8B1D2F;">Arquitectura del Sistema</th>
+                                                        <th class="font-weight-bold text-guinda text-center col-fija" style="border-bottom: 2px solid #8B1D2F;">Train Acc</th>
+                                                        <th class="font-weight-bold text-guinda text-center col-fija" style="border-bottom: 2px solid #8B1D2F;">Test Acc</th>
+                                                        <th class="font-weight-bold text-guinda text-center col-fija" style="border-bottom: 2px solid #8B1D2F;">Precision</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     <template v-if="listaPoolDinamica.length">
-                                                        <tr v-for="m in listaPoolDinamica" :key="m.arquitectura" style="border-bottom: 1px solid #E1E4E8;">
-                                                            <td :class="['text-left pl-4', m.es_optimizado ? 'text-verde-premium' : 'font-weight-bold text-grey-darken-3']" style="padding:12px;"><span v-text="m.arquitectura"></span></td>
-                                                            <td :class="['text-center text-body-2', m.es_optimizado ? 'text-verde-premium' : '']" style="padding:12px;" v-text="m.train_acc"></td>
-                                                            <td :class="['text-center text-body-1', m.es_optimizado ? 'text-verde-premium' : 'font-weight-bold text-navy']" style="padding:12px;" v-text="m.test_acc"></td>
-                                                            <td :class="['text-center text-body-2', m.es_optimizado ? 'text-verde-premium' : '']" style="padding:12px;" v-text="m.precision"></td>
+                                                        <tr v-for="m in listaPoolDinamica" :key="m.arquitectura">
+                                                            <td :class="['text-left col-fija', m.es_optimizado ? 'text-verde-premium' : 'font-weight-bold text-grey-darken-3']"><span v-text="m.arquitectura"></span></td>
+                                                            <td :class="['text-center text-body-2 col-fija', m.es_optimizado ? 'text-verde-premium' : '']" v-text="m.train_acc"></td>
+                                                            <td :class="['text-center text-body-1 col-fija', m.es_optimizado ? 'text-verde-premium' : 'font-weight-bold text-navy']" v-text="m.test_acc"></td>
+                                                            <td :class="['text-center text-body-2 col-fija', m.es_optimizado ? 'text-verde-premium' : '']" v-text="m.precision"></td>
                                                         </tr>
                                                     </template>
                                                     <tr v-else>
-                                                        <td colspan="4" class="text-center text-grey py-6" style="padding:24px;">Cargando pool de modelos del laboratorio...</td>
+                                                        <td colspan="4" class="text-center text-grey py-6 col-fija">Cargando pool de modelos del laboratorio...</td>
                                                     </tr>
                                                 </tbody>
                                             </table>
@@ -328,10 +368,7 @@
     <script src="https://cdn.jsdelivr.net/npm/vuetify@3.5.2/dist/vuetify.min.js"></script>
 
     <script>
-        // CORRECCIÓN DE PRIMARIA: Extraemos las dependencias destructuradas desde los objetos globales ya cargados
         const { createApp, ref, onMounted, nextTick } = Vue;
-        
-        // CORRECCIÓN CRÍTICA DE SINTAXIS: Vuetify cuelga de su propia constante global en la CDN de la v3, no de Vue
         const cuetifyInstance = Vuetify.createVuetify();
 
         createApp({
@@ -354,6 +391,11 @@
                 const hpDetallesSeleccionados = ref([]);
                 const linkDocSeleccionado = ref('');
                 const linkPaperSeleccionado = ref('');
+
+                const modeloSeleccionadoXAI = ref('Random Forest');
+                const featureSeleccionadaXAI = ref('alcohol');
+                const tipoVisualizacionSHAP = ref('barras');
+                const cacheDatosSHAP = ref(null);
 
                 const professorName = ref("Dr. León Palafox");
 
@@ -383,7 +425,7 @@
                         link_doc: "https://xgboost.readthedocs.io/en/stable/python/python_api.html#xgboost.XGBClassifier",
                         link_paper: "https://arxiv.org/abs/1603.02754",
                         hps: [
-                            { param: "n_estimators", rango: "Rango sugerido: 50 a 300 [Entero]", def: "Cantidad total de etapas secuenciales de boosting o árboles correctores a ajustar." },
+                            { param: "n_estimators", rango: "Rango sugerido: 50 a 400 [Entero]", def: "Cantidad total de etapas secuenciales de boosting o árboles correctores a ajustar." },
                             { param: "learning_rate", rango: "Rango: 0.01 a 0.3 (eta) [Flotante]", def: "Paso de aprendizaje que reduce la magnitud de la corrección de cada árbol." },
                             { param: "max_depth", rango: "Rango: 2 a 10 [Entero]", def: "Profundidad máxima permitida por árbol corrector para prevenir sobreajuste estructural." },
                             { param: "subsample", rango: "Rango: 0.5 a 1.0 [Flotante]", def: "Porcentaje de instancias a muestrear aleatoriamente antes de construir una nueva etapa." },
@@ -397,7 +439,7 @@
                     "Softmax Regression": {
                         paper_autor: "David Cox (1958) - Journal of the Royal Statistical Society",
                         descripcion: "Generalización multinomial de la regresión logística para problemas de clasificación multiclase. Utiliza una normalización exponencial (Softmax) para mapear combinaciones lineales a probabilidades.",
-                        fortalezas: "Máxima velocidad de convergencia, alta estabilidad matemática e interpretación directa de pesos.",
+                        fortalezas: "Cómputo instantáneo, coeficientes altamente interpretables y excelente como baseline de referencia.",
                         link_doc: "https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html",
                         link_paper: "https://www.jstor.org/stable/2983890",
                         hps: [
@@ -430,18 +472,153 @@
                     dialogoHps.value = true;
                 };
 
-                const grillasSugeridasPorModelo = {
-                    "Random Forest": "n_estimators: 10, 50\nmax_depth: 3, 5\ncriterion: gini, entropy",
-                    "XGBoost": "n_estimators: 20, 50\nmax_depth: 2, 4\nlearning_rate: 0.1, 0.2",
-                    "Softmax Regression": "C: 0.1, 1.0\ntol: 0.0001, 0.001",
-                    "Naive Bayes": "var_smoothing: 1e-9, 1e-7"
+                const calcularPipelineCompletoXAI = async () => {
+                    await calcularPermutationImportanceXAI();
+                    await calcularParcialDependenceXAI();
+                    await extraerMatricesSHAPValues();
                 };
 
-                const headersFeatures = ref([
+                const calcularPermutationImportanceXAI = async () => {
+                    try {
+                        const res = await fetch('/api/xai/permutation', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ model: modeloSeleccionadoXAI.value })
+                        });
+                        const data = await res.json();
+                        if (data.status === 'ok') {
+                            const p = data.permutations;
+                            const trace = {
+                                x: p.map(x => x.importance_mean).reverse(),
+                                y: p.map(x => x.feature).reverse(),
+                                type: 'bar', orientation: 'h',
+                                marker: { color: '#132B4F' },
+                                error_x: {
+                                    type: 'data',
+                                    array: p.map(x => x.importance_std).reverse(),
+                                    visible: true, color: '#8B1D2F'
+                                }
+                            };
+                            Plotly.newPlot('chart-permutation-importance', [trace], {
+                                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+                                margin: { l: 110, r: 10, b: 35, t: 10 },
+                                xaxis: { gridcolor: '#F0F0F0', title: 'Caída de Accuracy' }
+                            }, { responsive: true, displayModeBar: false });
+                        }
+                    } catch (e) { console.error(e); }
+                };
+
+                const calcularParcialDependenceXAI = async () => {
+                    try {
+                        const res = await fetch('/api/xai/pdp-ice', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ model: modeloSeleccionadoXAI.value, feature: featureSeleccionadaXAI.value })
+                        });
+                        const data = await res.json();
+                        if (data.status === 'ok') {
+                            const traces = [];
+                            data.ice.forEach(line => {
+                                traces.push({
+                                    x: data.grid, y: line, mode: 'lines',
+                                    line: { color: 'rgba(150,150,150,0.18)', width: 1.2 },
+                                    hoverinfo: 'skip', showlegend: false
+                                });
+                            });
+                            traces.push({
+                                x: data.grid, y: data.pdp, mode: 'lines',
+                                name: 'PDP Promedio', line: { color: '#132B4F', width: 4.5 }
+                            });
+                            Plotly.newPlot('chart-pdp-ice', traces, {
+                                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+                                margin: { l: 40, r: 10, b: 35, t: 10 },
+                                xaxis: { gridcolor: '#F0F0F0' }, yaxis: { gridcolor: '#F0F0F0' }
+                            }, { responsive: true, displayModeBar: false });
+                        }
+                    } catch (e) { console.error(e); }
+                };
+
+                const extraerMatricesSHAPValues = async () => {
+                    try {
+                        const res = await fetch('/api/xai/shap', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ model: modeloSeleccionadoXAI.value })
+                        });
+                        const data = await res.json();
+                        if (data.status === 'ok') {
+                            cacheDatosSHAP.value = data;
+                            renderizarGraficosSHAP();
+                        }
+                    } catch (e) { console.error(e); }
+                };
+
+                const renderizarGraficosSHAP = () => {
+                    if (!cacheDatosSHAP.value) return;
+                    const data = cacheDatosSHAP.value;
+                    const divId = 'chart-shap-workspace';
+                    
+                    if (tipoVisualizacionSHAP.value === 'barras') {
+                        const medias = data.features.map((feat, idx) => {
+                            const absSuma = data.shap_values.reduce((acc, row) => acc + Math.abs(row[idx]), 0);
+                            return { feature: feat, val: absSuma / data.shap_values.length };
+                        });
+                        const ordenado = medias.sort((a, b) => a.val - b.val).slice(-8);
+                        const trace = {
+                            x: ordenado.map(x => x.val), y: ordenado.map(x => x.feature),
+                            type: 'bar', orientation: 'h', marker: { color: '#2E7D32' }
+                        };
+                        Plotly.newPlot(divId, [trace], {
+                            paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+                            margin: { l: 110, r: 10, b: 35, t: 10 },
+                            xaxis: { gridcolor: '#F0F0F0', title: 'Impacto Medio |SHAP Value|' }
+                        }, { responsive: true, displayModeBar: false });
+                    }
+                    else if (tipoVisualizacionSHAP.value === 'beeswarm') {
+                        const xCoords = []; const yCoords = []; const colores = [];
+                        data.features.forEach((feat, fIdx) => {
+                            data.shap_values.forEach((row, rIdx) => {
+                                xCoords.push(row[fIdx]);
+                                yCoords.push(fIdx + (Math.random() * 0.3 - 0.15));
+                                colores.push(data.real_values[rIdx][fIdx]);
+                            });
+                        });
+                        const trace = {
+                            x: xCoords, y: yCoords, mode: 'markers',
+                            marker: {
+                                size: 6, opacity: 0.75, color: colores,
+                                colorscale: [[0, '#1E88E5'], [0.5, '#E0E0E0'], [1, '#FF0052']],
+                                showscale: true, colorbar: { title: 'Valor Real', thickness: 10, len: 0.9 }
+                            }
+                        };
+                        Plotly.newPlot(divId, [trace], {
+                            paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+                            margin: { l: 110, r: 10, b: 35, t: 10 },
+                            yaxis: { tickmode: 'array', tickvals: data.features.map((_, i) => i), ticktext: data.features, gridcolor: '#F5F5F5' },
+                            xaxis: { gridcolor: '#F0F0F0', title: 'SHAP Value (Impacto Predictivo)' }
+                        }, { responsive: true, displayModeBar: false });
+                    }
+                    else if (tipoVisualizacionSHAP.value === 'dependencia') {
+                        const fIdx = data.features.indexOf(featureSeleccionadaXAI.value);
+                        const trace = {
+                            x: data.real_values.map(row => row[fIdx]),
+                            y: data.shap_values.map(row => row[fIdx]),
+                            mode: 'markers', marker: { size: 9, color: '#132B4F', opacity: 0.85 }
+                        };
+                        Plotly.newPlot(divId, [trace], {
+                            paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+                            margin: { l: 50, r: 10, b: 45, t: 10 },
+                            xaxis: { gridcolor: '#F0F0F0', title: `Valor Estandarizado de ${featureSeleccionadaXAI.value}` },
+                            yaxis: { gridcolor: '#F0F0F0', title: 'SHAP Value (Impacto)' }
+                        }, { responsive: true, displayModeBar: false });
+                    }
+                };
+
+                const headersFeatures = [
                     'alcohol', 'malic_acid', 'ash', 'alcalinity_of_ash', 'magnesium', 
                     'total_phenols', 'flavanoids', 'nonflavanoid_phenols', 'proanthocyanidins', 
                     'color_intensity', 'hue', 'od280_od315_of_diluted_wines', 'proline'
-                ]);
+                ];
 
                 const headersPredictions = ref([
                     'PRED_RANDOM_FOREST', 'PRED_XGBOOST', 'PRED_NAIVE_BAYES', 'PRED_SOFTMAX_REGRESSION'
@@ -483,6 +660,9 @@
 
                         if (activeTab.value === 'proyecciones') {
                             dibujarGrafico();
+                        } else if (activeTab.value === 'xai') {
+                            await nextTick();
+                            await calcularPipelineCompletoXAI();
                         }
                     } catch (err) {
                         console.error("Fallo al conectar pipeline ML:", err);
@@ -515,18 +695,13 @@
 
                 const agregarFilaVacia = () => {
                     const nuevaFila = {};
-                    headersFeatures.value.forEach(h => nuevaFila[h] = '0.0');
+                    headersFeatures.forEach(h => nuevaFila[h] = '0.0');
                     headersPredictions.value.forEach(p => nuevaFila[p] = '');
                     rows.value.push(nuevaFila);
                 };
 
                 const removerFilaEspecifica = (idx) => {
-                    if (rows.value.length > 1) {
-                        rows.value.splice(idx, 1);
-                    } else {
-                        headersFeatures.value.forEach(h => rows.value[0][h] = '0.0');
-                        headersPredictions.value.forEach(p => rows.value[0][p] = '');
-                    }
+                    if (rows.value.length > 1) { rows.value.splice(idx, 1); }
                 };
 
                 const procesarInferenciaManual = async () => {
@@ -539,19 +714,9 @@
                         });
                         const resultado = await res.json();
                         if (resultado.status === 'ok') {
-                            rows.value = resultado.rows.map((newRow, idx) => {
-                                const filaPreservada = rows.value[idx] ? { ...rows.value[idx] } : { ...newRow };
-                                headersPredictions.value.forEach(p => {
-                                    filaPreservada[p] = newRow[p];
-                                });
-                                return filaPreservada;
-                            });
+                            rows.value = resultado.rows;
                         }
-                    } catch (e) {
-                        console.error("Error calculando inferencia manual:", e);
-                    } finally {
-                        cargandoInferencia.value = false;
-                    }
+                    } catch (e) { console.error(e); } finally { cargandoInferencia.value = false; }
                 };
 
                 const enviarCSVAlServidor = async (fileObj) => {
@@ -562,37 +727,29 @@
                     try {
                         const res = await fetch('/api/upload-csv', { method: 'POST', body: dataForm });
                         const resultado = await res.json();
-                        if (resultado.status === 'ok') {
-                            rows.value = resultado.rows;
-                        }
-                    } catch (e) {
-                        console.error(e);
-                    }
+                        if (resultado.status === 'ok') { rows.value = resultado.rows; }
+                    } catch (e) { console.error(e); }
                 };
 
                 const descargarSoloPlantillaFeatures = () => {
-                    const txtHead = headersFeatures.value.join(',');
-                    const txtRows = rows.value.map(r => headersFeatures.value.map(h => r[h] || '0.0').join(',')).join('\n');
+                    const txtHead = headersFeatures.join(',');
+                    const txtRows = rows.value.map(r => headersFeatures.map(h => r[h] || '0.0').join(',')).join('\n');
                     const blob = new Blob([txtHead + '\n' + txtRows], { type: 'text/csv;charset=utf-8;' });
                     const link = document.createElement("a");
                     link.href = URL.createObjectURL(blob);
-                    link.setAttribute("download", "plantilla_limpia_features.csv");
-                    document.body.appendChild(link);
+                    link.setAttribute("download", "plantilla_features.csv");
                     link.click();
-                    document.body.removeChild(link);
                 };
 
                 const descargarPrediccionesCompletas = () => {
-                    const todasLasCabeceras = [...headersFeatures.value, ...headersPredictions.value];
+                    const todasLasCabeceras = [...headersFeatures, ...headersPredictions.value];
                     const txtHead = todasLasCabeceras.join(',');
                     const txtRows = rows.value.map(r => todasLasCabeceras.map(h => r[h] || '').join(',')).join('\n');
                     const blob = new Blob([txtHead + '\n' + txtRows], { type: 'text/csv;charset=utf-8;' });
                     const link = document.createElement("a");
                     link.href = URL.createObjectURL(blob);
-                    link.setAttribute("download", "reporte_consolidado_ia.csv");
-                    document.body.appendChild(link);
+                    link.setAttribute("download", "reporte_consolidado.csv");
                     link.click();
-                    document.body.removeChild(link);
                 };
 
                 const dibujarGrafico = () => {
@@ -603,10 +760,8 @@
                         const sub = pts.filter(p => p.clase === c);
                         const colores = ['#132B4F', '#8B1D2F', '#D4AF37'];
                         return {
-                            x: sub.map(p => p[key + '_x']),
-                            y: sub.map(p => p[key + '_y']),
-                            mode: 'markers',
-                            name: c.toUpperCase(),
+                            x: sub.map(p => p[key + '_x']), y: sub.map(p => p[key + '_y']),
+                            mode: 'markers', name: c.toUpperCase(),
                             marker: { size: 10, color: colores[i], opacity: 0.85 }
                         };
                     });
@@ -618,17 +773,17 @@
                 };
 
                 const manejarCambioTab = async (tabValue) => {
-                    if (tabValue === 'proyecciones') {
-                        await nextTick();
-                        dibujarGrafico();
-                    }
+                    await nextTick();
+                    if (tabValue === 'proyecciones') { dibujarGrafico(); }
+                    else if (tabValue === 'xai') { await calcularPipelineCompletoXAI(); }
                 };
 
                 onMounted(cargarPipelineML);
 
-                return { activeTab, algoritmoDim, mlData, integrantes, headersFeatures, headersPredictions, rows, cargandoInferencia, modeloReentrenar, grillaTextoUsuario, ejecutandoGridSearch, dataBenchmarkResp, listaPoolDinamica, cambiarHiperparametrosPorDefecto, ejecutarBenchmarkMallas, agregarFilaVacia, removerFilaEspecifica, procesarInferenciaManual, enviarCSVAlServidor, descargarSoloPlantillaFeatures, descargarPrediccionesCompletas, dibujarGrafico, manejarCambioTab, carouselIndex, dialogoHps, modeloSeleccionadoHps, hpDetallesSeleccionados, catalogoModelosExplicativos, auditarHiperparametrosModelo, professorName, linkDocSeleccionado, linkPaperSeleccionado };
+                // CORRECCIÓN: Se expone explícitamente ejecutarBenchmarkMallas en el retorno del setup para que el DOM lo consuma
+                return { activeTab, algoritmoDim, mlData, integrantes, headersFeatures, headersPredictions, rows, cargandoInferencia, modeloReentrenar, grillaTextoUsuario, ejecutandoGridSearch, dataBenchmarkResp, listaPoolDinamica, cambiarHiperparametrosPorDefecto, ejecutarBenchmarkMallas, agregarFilaVacia, removerFilaEspecifica, procesarInferenciaManual, enviarCSVAlServidor, descargarSoloPlantillaFeatures, descargarPrediccionesCompletas, dibujarGrafico, manejarCambioTab, carouselIndex, dialogoHps, modeloSeleccionadoHps, hpDetallesSeleccionados, catalogoModelosExplicativos, auditarHiperparametrosModelo, professorName, linkDocSeleccionado, linkPaperSeleccionado, modeloSeleccionadoXAI, featureSeleccionadaXAI, tipoVisualizacionSHAP, calcularPipelineCompletoXAI, calcularParcialDependenceXAI, renderizarGraficosSHAP };
             }
-        }).use(cuetifyInstance).mount('#app'); // Montamos usando la instancia nativa 'cuetifyInstance' inyectada arriba
+        }).use(cuetifyInstance).mount('#app');
     </script>
 </body>
 </html>
