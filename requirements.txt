@@ -5,6 +5,7 @@ pandas
 scikit-learn
 xgboost
 optuna
+umap-learn
 shap
 matplotlib
 scipy
