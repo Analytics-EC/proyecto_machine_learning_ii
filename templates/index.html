@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>UP | Laboratorio de Inteligencia Artificial</title>
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@3.5.2/dist/vuetify.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.x/css/materialdesignicons.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <style>
+        body, .v-application { background-color: #FAF8F6 !important; font-family: 'Roboto', sans-serif; }
+        .up-navbar { background-color: #FFFFFF !important; border-bottom: 2px solid #132B4F; }
+        .up-card-premium {
+            background: #FFFFFF !important;
+            border: 1px solid rgba(19, 43, 79, 0.08) !important;
+            border-radius: 16px !important;
+        }
+        .text-navy { color: #132B4F; }
+        .text-guinda { color: #8B1D2F; }
+        
+        .col-fija {
+            width: 175px !important;
+            min-width: 175px !important;
+            max-width: 175px !important;
+            padding: 8px !important;
+        }
+        /* Columna especial más delgada para la acción de borrar */
+        .col-accion {
+            width: 80px !important;
+            min-width: 80px !important;
+            max-width: 80px !important;
+            padding: 8px !important;
+            text-align: center !important;
+        }
+        .table-wrapper { 
+            border: 1px solid #E1E4E8; 
+            border-radius: 12px; 
+            overflow-x: auto !important; 
+            background: white; 
+            margin-top: 10px;
+        }
+        .v-table { background: white !important; width: max-content !important; }
+        .celda-input .v-field__input {
+            padding-top: 4px !important;
+            padding-bottom: 4px !important;
+            font-size: 13px !important;
+            text-align: center !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <v-app style="background: transparent;">
+            
+            <div class="up-navbar pa-4 d-flex align-center justify-space-between flex-wrap">
+                <div class="d-flex align-center">
+                    <v-img src="{{ url_for('static', filename='logo_up.png') }}" max-height="65" max-width="180" contain class="mr-4"></v-img>
+                    <div>
+                        <h1 class="text-h5 font-weight-bold text-navy" style="font-family: 'Montserrat', sans-serif;">
+                            Laboratorio de Machine Learning 2
+                        </h1>
+                        <p class="text-caption text-grey-darken-2 mb-0">Profesor: <strong class="text-guinda">Dr. León Palafox</strong></p>
+                    </div>
+                </div>
+
+                <v-tabs v-model="activeTab" color="#8B1D2F" @update:model-value="manejarCambioTab">
+                    <v-tab value="proyecciones"><v-icon start icon="mdi-chart-scatter-plot"></v-icon>Proyecciones</v-tab>
+                    <v-tab value="modelos"><v-icon start icon="mdi-brain"></v-icon>Métricas Avanzadas</v-tab>
+                    <v-tab value="editor"><v-icon start icon="mdi-table-edit"></v-icon>Módulo de Inferencia (.csv)</v-tab>
+                </v-tabs>
+            </div>
+
+            <v-main class="pt-6">
+                <v-container fluid class="px-8">
+                    <v-window v-model="activeTab">
+                        
+                        <v-window-item value="proyecciones">
+                            <v-row>
+                                <v-col cols="12" md="4">
+                                    <v-card class="up-card-premium pa-6">
+                                        <div class="text-subtitle-1 font-weight-bold text-navy mb-4">Integrantes del Equipo</div>
+                                        <div v-for="m in integrantes" :key="m.email" class="mb-3 border-bottom pb-1">
+                                            <div class="text-body-2 font-weight-bold text-grey-darken-3" v-text="m.nombre"></div>
+                                            <div class="text-caption text-guinda" v-text="m.email"></div>
+                                        </div>
+                                    </v-card>
+                                </v-col>
+                                <v-col cols="12" md="8">
+                                    <v-card class="up-card-premium pa-6">
+                                        <div class="d-flex justify-space-between align-center mb-4 flex-wrap">
+                                            <div>
+                                                <h3 class="text-h6 font-weight-bold text-navy">Reducción Espacial</h3>
+                                            </div>
+                                            <v-btn-toggle v-model="algoritmoDim" mandatory color="#132B4F" variant="tonal" rounded="lg" @update:model-value="dibujarGrafico">
+                                                <v-btn value="pca" size="small">PCA</v-btn>
+                                                <v-btn value="tsne" size="small">t-SNE</v-btn>
+                                                <v-btn value="umap" size="small">UMAP</v-btn>
+                                            </v-btn-toggle>
+                                        </div>
+                                        <div id="plotly-chart-area" style="width: 100%; height: 430px;"></div>
+                                    </v-card>
+                                </v-col>
+                            </v-row>
+                        </v-window-item>
+
+                        <v-window-item value="modelos">
+                            <v-row>
+                                <v-col cols="12" v-for="(stats, name) in mlData.modelos" :key="name" md="6" class="mb-4">
+                                    <v-card class="up-card-premium pa-5">
+                                        <div class="text-h6 font-weight-bold text-navy border-b pb-2 mb-3" v-text="name"></div>
+                                        <v-row class="text-center my-2">
+                                            <v-col cols="6">
+                                                <div class="text-caption text-grey font-weight-bold">TRAIN ACCURACY</div>
+                                                <div class="text-h4 font-weight-black text-grey-darken-3" v-text="stats.train_acc"></div>
+                                            </v-col>
+                                            <v-col cols="6" style="border-left: 1px solid #eee;">
+                                                <div class="text-caption text-guinda font-weight-bold">TEST ACCURACY</div>
+                                                <div class="text-h4 font-weight-black text-guinda" v-text="stats.test_acc"></div>
+                                            </v-col>
+                                        </v-row>
+                                        <v-row class="bg-grey-lighten-5 rounded-lg pa-2 mx-1 mt-3">
+                                            <v-col cols="6" class="text-left text-caption text-grey-darken-2">
+                                                Precision: <strong v-text="stats.precision"></strong>
+                                            </v-col>
+                                            <v-col cols="6" class="text-left text-caption text-grey-darken-2">
+                                                Recall: <strong v-text="stats.recall"></strong>
+                                            </v-col>
+                                        </v-row>
+                                    </v-card>
+                                </v-col>
+                            </v-row>
+                        </v-window-item>
+
+                        <v-window-item value="editor">
+                            <v-row>
+                                <v-col cols="12">
+                                    <v-card class="up-card-premium pa-6">
+                                        <div class="text-h6 font-weight-bold text-navy mb-1">Módulo de Inferencia y Edición de Matrices</div>
+                                        <p class="text-caption text-grey mb-4">Ingresa parámetros químicos en la tabla de características y observa los resultados predictivos calculados por el backend en la sección de inferencias.</p>
+                                        
+                                        <v-file-input
+                                            label="Cargar archivo .csv externo para extraer características"
+                                            variant="outlined" color="#8B1D2F" density="comfortable" prepend-icon="mdi-cloud-upload"
+                                            @update:model-value="enviarCSVAlServidor"
+                                        ></v-file-input>
+
+                                        <div class="d-flex align-center my-4 flex-wrap gap-2">
+                                            <v-btn color="success" variant="flat" prepend-icon="mdi-plus" class="text-capitalize mr-1" @click="agregarFilaVacia">
+                                                Añadir Fila
+                                            </v-btn>
+                                            <v-btn color="#132B4F" variant="flat" prepend-icon="mdi-file-table-outline" class="text-capitalize mr-1" @click="descargarSoloPlantillaFeatures">
+                                                Descargar Plantilla Base (X)
+                                            </v-btn>
+                                            <v-btn color="grey-darken-3" variant="flat" prepend-icon="mdi-download" class="text-capitalize mr-1" @click="descargarPrediccionesCompletas">
+                                                Exportar Predicciones Totales
+                                            </v-btn>
+                                            <v-btn color="#8B1D2F" variant="flat" prepend-icon="mdi-calculator" class="text-capitalize" @click="procesarInferenciaManual" :loading="cargandoInferencia">
+                                                Calcular Inferencia de la Tabla
+                                            </v-btn>
+                                        </div>
+
+                                        <div class="text-subtitle-2 font-weight-bold text-navy mt-4 mb-2 d-flex align-center">
+                                            <v-icon color="#132B4F" start icon="mdi-beaker-outline" class="mr-2"></v-icon>
+                                            1. Matriz de Características Químicas de Entrada (Features $X$)
+                                        </div>
+                                        <div class="table-wrapper mb-6">
+                                            <table class="v-table v-table--density-compact" style="border-collapse: collapse;">
+                                                <thead>
+                                                    <tr class="bg-grey-lighten-4">
+                                                        <th v-for="h in headersFeatures" :key="h" class="font-weight-bold text-navy text-left col-fija" style="border-bottom: 2px solid #132B4F;" v-text="h"></th>
+                                                        <th class="font-weight-bold text-navy col-accion" style="border-bottom: 2px solid #132B4F;">Acción</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr v-for="(row, idx) in rows" :key="idx">
+                                                        <td v-for="h in headersFeatures" :key="h" class="col-fija align-center">
+                                                            <v-text-field
+                                                                v-model="row[h]"
+                                                                density="compact"
+                                                                variant="solo-filled"
+                                                                flat
+                                                                hide-details
+                                                                class="celda-input"
+                                                            ></v-text-field>
+                                                        </td>
+                                                        <td class="col-accion">
+                                                            <v-btn icon="mdi-delete" size="x-small" color="error" variant="text" @click="removerFilaEspecifica(idx)"></v-btn>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <div class="text-subtitle-2 font-weight-bold text-guinda mt-4 mb-2 d-flex align-center">
+                                            <v-icon color="#8B1D2F" start icon="mdi-brain" class="mr-2"></v-icon>
+                                            2. Resultados de las Predicciones Generadas (Modelos de IA)
+                                        </div>
+                                        <div class="table-wrapper">
+                                            <table class="v-table v-table--density-compact" style="border-collapse: collapse;">
+                                                <thead>
+                                                    <tr class="bg-red-lighten-5">
+                                                        <th v-for="h in headersPredictions" :key="h" class="font-weight-bold text-guinda text-left col-fija" style="border-bottom: 2px solid #8B1D2F;" v-text="h.replace('PRED_', '')"></th>
+                                                        <th class="font-weight-bold text-guinda col-accion" style="border-bottom: 2px solid #8B1D2F;">Estado</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr v-for="(row, idx) in rows" :key="idx">
+                                                        <td v-for="h in headersPredictions" :key="h" class="col-fija align-center">
+                                                            <v-chip size="small" :color="row[h] ? '#132B4F' : 'grey-darken-1'" variant="flat" class="font-weight-bold w-100 justify-center" v-text="row[h] || 'Esperando cálculo'"></v-chip>
+                                                        </td>
+                                                        <td class="col-accion">
+                                                            <v-icon size="small" :color="row[headersPredictions[0]] ? 'success' : 'grey'" :icon="row[headersPredictions[0]] ? 'mdi-check-circle' : 'mdi-clock-outline'"></v-icon>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        
+                                    </v-card>
+                                </v-col>
+                            </v-row>
+                        </v-window-item>
+
+                    </v-window>
+                </v-container>
+            </v-main>
+        </v-app>
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@3.5.2/dist/vuetify.min.js"></script>
+
+    <script>
+        const { createApp, ref, onMounted, nextTick } = Vue;
+        const vuetify = Vuetify.createVuetify();
+
+        createApp({
+            setup() {
+                const activeTab = ref('editor');
+                const algoritmoDim = ref('pca');
+                const mlData = ref({ modelos: {}, clases: [], puntos: [] });
+                const cargandoInferencia = ref(false);
+
+                const headersFeatures = ref([
+                    'alcohol', 'malic_acid', 'ash', 'alcalinity_of_ash', 'magnesium', 
+                    'total_phenols', 'flavanoids', 'nonflavanoid_phenols', 'proanthocyanidins', 
+                    'color_intensity', 'hue', 'od280_od315_of_diluted_wines', 'proline'
+                ]);
+
+                const headersPredictions = ref([
+                    'PRED_RANDOM_FOREST', 'PRED_XGBOOST', 'PRED_NAIVE_BAYES', 'PRED_SOFTMAX_REGRESSION'
+                ]);
+                
+                const rows = ref([
+                    {
+                        'alcohol': '13.00', 'malic_acid': '2.34', 'ash': '2.36', 'alcalinity_of_ash': '19.5', 'magnesium': '99.7',
+                        'total_phenols': '2.29', 'flavanoids': '2.03', 'nonflavanoid_phenols': '0.36', 'proanthocyanidins': '1.59',
+                        'color_intensity': '5.05', 'hue': '0.95', 'od280_od315_of_diluted_wines': '2.61', 'proline': '746.0',
+                        'PRED_RANDOM_FOREST': '', 'PRED_XGBOOST': '', 'PRED_NAIVE_BAYES': '', 'PRED_SOFTMAX_REGRESSION': ''
+                    }
+                ]);
+
+                const integrantes = [
+                    { nombre: 'Jhosse Paul Márquez Ruiz', email: '0287289@up.edu.mx' },
+                    { nombre: 'César Augusto Pérez Rosas', email: '0287285@up.edu.mx' },
+                    { nombre: 'Gerardo David Rivero Rique', email: '0287274@up.edu.mx' },
+                    { nombre: 'Luis Antonio Mani Yáñez', email: '0287239@up.edu.mx' },
+                    { nombre: 'Oscar Barranco Velázquez', email: '0287244@up.edu.mx' }
+                ];
+
+                const cargarPipelineML = async () => {
+                    try {
+                        const res = await fetch('/api/ml-results');
+                        mlData.value = await res.json();
+                        if (activeTab.value === 'proyecciones') {
+                            dibujarGrafico();
+                        }
+                    } catch (err) {
+                        console.error("Fallo al conectar pipeline ML:", err);
+                    }
+                };
+
+                const agregarFilaVacia = () => {
+                    const nuevaFila = {};
+                    headersFeatures.value.forEach(h => nuevaFila[h] = '0.0');
+                    headersPredictions.value.forEach(p => nuevaFila[p] = '');
+                    rows.value.push(nuevaFila);
+                };
+
+                // ACCIÓN DE REMOVER REGISTRO: Elimina de forma simétrica la fila en ambas vistas basándose en su índice
+                const removerFilaEspecifica = (indice) => {
+                    if (rows.value.length > 1) {
+                        rows.value.splice(indice, 1);
+                    } else {
+                        // Si es la última fila que queda, en lugar de romper el layout, la reiniciamos a ceros
+                        headersFeatures.value.forEach(h => rows.value[0][h] = '0.0');
+                        headersPredictions.value.forEach(p => rows.value[0][p] = '');
+                    }
+                };
+
+                const procesarInferenciaManual = async () => {
+                    cargandoInferencia.value = true;
+                    try {
+                        const res = await fetch('/api/predict-table', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ rows: rows.value })
+                        });
+                        const resultado = await res.json();
+                        
+                        if (resultado.status === 'ok') {
+                            rows.value = resultado.rows.map((newRow, idx) => {
+                                const filaPreservada = rows.value[idx] ? { ...rows.value[idx] } : { ...newRow };
+                                headersPredictions.value.forEach(p => {
+                                    filaPreservada[p] = newRow[p];
+                                });
+                                return filaPreservada;
+                            });
+                        }
+                    } catch (e) {
+                        console.error("Error calculando inferencia manual:", e);
+                    } finally {
+                        cargandoInferencia.value = false;
+                    }
+                };
+
+                const enviarCSVAlServidor = async (fileObj) => {
+                    if (!fileObj) return;
+                    const archivo = Array.isArray(fileObj) ? fileObj[0] : fileObj;
+                    
+                    const dataForm = new FormData();
+                    dataForm.append('file', archivo);
+
+                    try {
+                        const res = await fetch('/api/upload-csv', { method: 'POST', body: dataForm });
+                        const resultado = await res.json();
+                        
+                        if (resultado.status === 'ok') {
+                            rows.value = resultado.rows;
+                        }
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const descargarSoloPlantillaFeatures = () => {
+                    const txtHead = headersFeatures.value.join(',');
+                    const txtRows = rows.value.map(r => headersFeatures.value.map(h => r[h] || '0.0').join(',')).join('\n');
+                    const blob = new Blob([txtHead + '\n' + txtRows], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement("a");
+                    link.href = URL.createObjectURL(blob);
+                    link.setAttribute("download", "plantilla_limpia_features.csv");
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                };
+
+                const descargarPrediccionesCompletas = () => {
+                    const todasLasCabeceras = [...headersFeatures.value, ...headersPredictions.value];
+                    const txtHead = todasLasCabeceras.join(',');
+                    const txtRows = rows.value.map(r => todasLasCabeceras.map(h => r[h] || '').join(',')).join('\n');
+                    const blob = new Blob([txtHead + '\n' + txtRows], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement("a");
+                    link.href = URL.createObjectURL(blob);
+                    link.setAttribute("download", "reporte_consolidado_ia.csv");
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                };
+
+                const dibujarGrafico = () => {
+                    if (!mlData.value.puntos || !mlData.value.puntos.length) return;
+                    const pts = mlData.value.puntos;
+                    const key = algoritmoDim.value;
+
+                    const traces = mlData.value.clases.map((c, i) => {
+                        const sub = pts.filter(p => p.clase === c);
+                        const colores = ['#132B4F', '#8B1D2F', '#D4AF37'];
+                        return {
+                            x: sub.map(p => p[key + '_x']),
+                            y: sub.map(p => p[key + '_y']),
+                            mode: 'markers',
+                            name: c.toUpperCase(),
+                            marker: { size: 10, color: colores[i], opacity: 0.85 }
+                        };
+                    });
+
+                    Plotly.newPlot('plotly-chart-area', traces, {
+                        paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+                        margin: { l: 40, r: 10, b: 40, t: 10 },
+                        xaxis: { gridcolor: '#F0F0F0' }, yaxis: { gridcolor: '#F0F0F0' }
+                    }, { responsive: true, displayModeBar: false });
+                };
+
+                const manejarCambioTab = async (tabValue) => {
+                    if (tabValue === 'proyecciones') {
+                        await nextTick();
+                        dibujarGrafico();
+                    }
+                };
+
+                onMounted(cargarPipelineML);
+
+                return { activeTab, algoritmoDim, mlData, integrantes, headersFeatures, headersPredictions, rows, cargandoInferencia, agregarFilaVacia, removerFilaEspecifica, procesarInferenciaManual, enviarCSVAlServidor, descargarSoloPlantillaFeatures, descargarPrediccionesCompletas, dibujarGrafico, manejarCambioTab };
+            }
+        }).use(vuetify).mount('#app');
+    </script>
+</body>
+</html>
