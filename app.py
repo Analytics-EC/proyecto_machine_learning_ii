@@ -5,7 +5,6 @@ import io
 import sys
 import time
 import optuna
-
 from sklearn.datasets import load_wine
 from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV, cross_val_score
 from sklearn.preprocessing import StandardScaler
@@ -17,13 +16,13 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.inspection import permutation_importance, partial_dependence
-import umap
 
-# Intentar importar SHAP de forma segura
 try:
     import shap
 except ImportError:
     shap = None
+
+import umap
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
@@ -34,15 +33,17 @@ SCALER_GLOBAL = None
 FEATURES_ML = []
 CLASES_TARGET = []
 X_TRAIN_SCALED, X_TEST_SCALED, Y_TRAIN, Y_TEST = None, None, None, None
+X_ALL_SCALED, Y_ALL = None, None
 
 def inicializar_entorno_ia():
     global MODELOS_POOL, SCALER_GLOBAL, FEATURES_ML, CLASES_TARGET
-    global X_TRAIN_SCALED, X_TEST_SCALED, Y_TRAIN, Y_TEST
+    global X_TRAIN_SCALED, X_TEST_SCALED, Y_TRAIN, Y_TEST, X_ALL_SCALED, Y_ALL
     
     wine = load_wine()
     X, y = wine.data, wine.target
     FEATURES_ML = list(wine.feature_names)
     CLASES_TARGET = list(wine.target_names)
+    Y_ALL = y.tolist()
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
     Y_TRAIN, Y_TEST = y_train, y_test
@@ -50,7 +51,7 @@ def inicializar_entorno_ia():
     SCALER_GLOBAL = StandardScaler()
     X_train_scaled = SCALER_GLOBAL.fit_transform(X_train)
     X_test_scaled = SCALER_GLOBAL.transform(X_test)
-    X_all_scaled = SCALER_GLOBAL.transform(X)
+    X_ALL_SCALED = SCALER_GLOBAL.transform(X)
     
     X_TRAIN_SCALED, X_TEST_SCALED = X_train_scaled, X_test_scaled
 
@@ -70,20 +71,7 @@ def inicializar_entorno_ia():
             "recall": f"{recall_score(y_test, model.predict(X_test_scaled), average='macro')*100:.2f}%"
         }
 
-    pca_coor = PCA(n_components=2).fit_transform(X_all_scaled)
-    tsne_coor = TSNE(n_components=2, perplexity=15, random_state=42).fit_transform(X_all_scaled)
-    umap_coor = umap.UMAP(n_neighbors=15, min_dist=0.1, random_state=42).fit_transform(X_all_scaled)
-
-    puntos = []
-    for i in range(len(X)):
-        puntos.append({
-            "clase": CLASES_TARGET[y[i]],
-            "pca_x": float(pca_coor[i, 0]), "pca_y": float(pca_coor[i, 1]),
-            "tsne_x": float(tsne_coor[i, 0]), "tsne_y": float(tsne_coor[i, 1]),
-            "umap_x": float(umap_coor[i, 0]), "umap_y": float(umap_coor[i, 1])
-        })
-
-    return {"modelos": modelos_stats, "clases": CLASES_TARGET, "puntos": puntos}
+    return {"modelos": modelos_stats, "clases": CLASES_TARGET}
 
 CACHED_DATA = inicializar_entorno_ia()
 
@@ -95,19 +83,58 @@ def index():
 def get_ml_results():
     return jsonify(CACHED_DATA)
 
-# 1. API NUEVA: CALCULAR IMPORTANCIA POR PERMUTACIONES (CON SU RESPECTIVA DESVIACIÓN)
+@app.route("/api/xai/projections-dynamic", methods=["GET", "POST"])
+def get_dynamic_projections():
+    try:
+        perplexity = 15
+        n_neighbors = 15
+        min_dist = 0.1
+        pca_components = 2
+        pca_solver = "auto"
+
+        if request.method == "POST" and request.is_json:
+            req = request.get_json() or {}
+            if req.get("tsne_perplexity") is not None:
+                perplexity = max(5, min(50, int(float(req.get("tsne_perplexity")))))
+            if req.get("umap_neighbors") is not None:
+                n_neighbors = max(2, min(60, int(float(req.get("umap_neighbors")))))
+            if req.get("umap_min_dist") is not None:
+                min_dist = max(0.0, min(0.9, float(req.get("umap_min_dist"))))
+            if req.get("pca_components") is not None:
+                pca_components = max(2, min(5, int(float(req.get("pca_components")))))
+            if req.get("pca_solver") is not None:
+                pca_solver = str(req.get("pca_solver"))
+        
+        pca_coor = PCA(n_components=int(pca_components), svd_solver=pca_solver, random_state=42).fit_transform(X_ALL_SCALED)
+        tsne_coor = TSNE(n_components=2, perplexity=int(perplexity), random_state=42).fit_transform(X_ALL_SCALED)
+        
+        reducer = umap.UMAP(n_neighbors=int(n_neighbors), min_dist=float(min_dist), n_components=2, random_state=42)
+        umap_coor = reducer.fit_transform(X_ALL_SCALED)
+        
+        puntos = []
+        for i in range(len(X_ALL_SCALED)):
+            puntos.append({
+                "clase": CLASES_TARGET[Y_ALL[i]],
+                "pca_x": float(pca_coor[i, 0]), "pca_y": float(pca_coor[i, 1]),
+                "tsne_x": float(tsne_coor[i, 0]), "tsne_y": float(tsne_coor[i, 1]),
+                "umap_x": float(umap_coor[i, 0]), "umap_y": float(umap_coor[i, 1])
+            })
+            
+        return jsonify({"status": "ok", "puntos": puntos})
+    except Exception as e:
+        print(f"❌ CRASH EN PROYECCIONES XAI: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route("/api/xai/permutation", methods=["POST"])
 def get_permutation_importance():
     try:
         req = request.get_json()
         name = req.get("model", "Random Forest")
-        model = MODELOS_POOL.get(name)
-        
+        base_name = name.replace(" (Optimizado)", "")
+        model = MODELOS_POOL.get(name) or MODELOS_POOL.get(base_name)
         if not model:
             return jsonify({"status": "error", "message": "Modelo no encontrado"}), 400
-            
         r = permutation_importance(model, X_TEST_SCALED, Y_TEST, n_repeats=5, random_state=42, n_jobs=-1)
-        
         lista_importancias = []
         for idx, feat in enumerate(FEATURES_ML):
             lista_importancias.append({
@@ -115,221 +142,74 @@ def get_permutation_importance():
                 "importance_mean": float(r.importances_mean[idx]),
                 "importance_std": float(r.importances_std[idx])
             })
-            
-        # Ordenar de mayor a menor impacto predictivo
         lista_importancias = sorted(lista_importancias, key=lambda x: x["importance_mean"], reverse=True)
         return jsonify({"status": "ok", "permutations": lista_importancias})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# 2. API NUEVA: CALCULAR PDP E ICE PLOTS PARA UNA VARIABLE SELECCIONADA
 @app.route("/api/xai/pdp-ice", methods=["POST"])
 def get_pdp_ice_data():
     try:
         req = request.get_json()
         model_name = req.get("model", "Random Forest")
         feature_name = req.get("feature", "alcohol")
-        
-        model = MODELOS_POOL.get(model_name)
+        base_name = model_name.replace(" (Optimizado)", "")
+        model = MODELOS_POOL.get(model_name) or MODELOS_POOL.get(base_name)
         if not model or feature_name not in FEATURES_ML:
             return jsonify({"status": "error", "message": "Parámetros inválidos"}), 400
-            
         feat_idx = FEATURES_ML.index(feature_name)
-        
-        # Calcular Dependencia Parcial e ICE combinado usando Scikit-Learn
         pdp_res = partial_dependence(model, X_TRAIN_SCALED, features=[feat_idx], kind="both", grid_resolution=25)
-        
         grid_values = pdp_res["grid_values"][0].tolist()
-        pdp_values = pdp_res["average"][0].tolist()  # La curva promedio (PDP)
-        ice_lines = pdp_res["individual"][0].tolist()  # Las curvas individuales (ICE, máximo 30 para no saturar)
-        
-        return jsonify({
-            "status": "ok",
-            "grid": grid_values,
-            "pdp": pdp_values,
-            "ice": ice_lines[:30] 
-        })
+        pdp_values = pdp_res["average"][0].tolist()
+        ice_lines = pdp_res["individual"][0].tolist()
+        return jsonify({"status": "ok", "grid": grid_values, "pdp": pdp_values, "ice": ice_lines[:30]})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# 3. API NUEVA: MATRICES DE EXPLICABILIDAD ADAPTATIVA SHAP PARA GRÁFICOS INTERACTIVOS
 @app.route("/api/xai/shap", methods=["POST"])
 def get_shap_values():
     try:
         req = request.get_json()
         model_name = req.get("model", "Random Forest")
-        model = MODELOS_POOL.get(model_name)
+        base_name = model_name.replace(" (Optimizado)", "")
+        model = MODELOS_POOL.get(model_name) or MODELOS_POOL.get(base_name)
         
         if not model:
             return jsonify({"status": "error", "message": "Modelo inválido"}), 400
             
-        # Muestreo seguro de 60 registros para evitar latencia de renderizado
         X_sample = X_TEST_SCALED[:60]
         
-        # Enrutador inteligente de explicadores SHAP basados en la naturaleza del modelo
-        if "Random Forest" in model_name or "XGBoost" in model_name:
+        if "Random Forest" in base_name or "XGBoost" in base_name:
             explainer = shap.TreeExplainer(model)
             shap_values = explainer.shap_values(X_sample)
         else:
-            # KernelExplainer agnóstico y robusto para Naive Bayes y Logística multinomial
-            pred_func = model.predict_proba
-            explainer = shap.KernelExplainer(pred_func, shap.kmeans(X_TRAIN_SCALED, 5))
+            explainer = shap.KernelExplainer(model.predict_proba, shap.kmeans(X_TRAIN_SCALED, 5))
             shap_values = explainer.shap_values(X_sample)
 
-        # Homogeneizar dimensiones para clasificadores multiclase (Vino tiene 3 clases, tomamos Clase 1)
         if isinstance(shap_values, list):
-            vals = np.array(shap_values[1])
-        elif len(shap_values.shape) == 3:
-            vals = shap_values[:, :, 1]
+            vals = np.array(shap_values[1], dtype=np.float64)
+        elif hasattr(shap_values, "values"):
+            v_raw = shap_values.values
+            if len(v_raw.shape) == 3:
+                vals = np.array(v_raw[:, :, 1], dtype=np.float64)
+            else:
+                vals = np.array(v_raw, dtype=np.float64)
         else:
-            vals = np.array(shap_values)
-
-        # Emparejar matrices completas para reconstruir Importance, Beeswarm y Dependencia en el cliente
-        matriz_shap = vals.tolist()
-        valores_reales = X_sample.tolist()
-        
+            shap_arr = np.array(shap_values, dtype=np.float64)
+            if len(shap_arr.shape) == 3:
+                vals = shap_arr[:, :, 1]
+            else:
+                vals = shap_arr
+            
         return jsonify({
             "status": "ok",
             "features": FEATURES_ML,
-            "shap_values": matriz_shap,
-            "real_values": valores_reales
+            "shap_values": vals.tolist(),
+            "real_values": X_sample.tolist()
         })
     except Exception as e:
+        print(f"❌ CRASH EN SHAP VALUES: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route("/api/retrain", methods=["POST"])
-def retrain_and_benchmark():
-    try:
-        req = request.get_json()
-        modelo_seleccionado = req.get("model")
-        grid_raw_text = req.get("grid_text", "")
-
-        param_grid = {}
-        for linea in grid_raw_text.split("\n"):
-            if ":" in linea:
-                clave, valores = linea.split(":", 1)
-                param_grid[clave.strip()] = [evaluar_tipo_estricto(x) for x in valores.split(",")]
-
-        if modelo_seleccionado == "Random Forest":
-            estimator = RandomForestClassifier(random_state=42)
-        elif modelo_seleccionado == "XGBoost":
-            estimator = XGBClassifier(objective='multi:softprob', random_state=42)
-        elif modelo_seleccionado == "Softmax Regression":
-            estimator = LogisticRegression(multi_class='multinomial', solver='lbfgs', max_iter=500, random_state=42)
-        else:
-            estimator = GaussianNB()
-
-        resultados_lista = []
-
-        # 1. GRID SEARCH
-        t_start = time.perf_counter()
-        gs = GridSearchCV(estimator, param_grid, cv=3, scoring='accuracy', n_jobs=-1)
-        gs.fit(X_TRAIN_SCALED, Y_TRAIN)
-        t_grid = time.perf_counter() - t_start
-        resultados_lista.append({
-            "estrategia": "Grid Search (Fuerza Bruta)",
-            "tiempo": f"{t_grid:.4f}s",
-            "test_acc": f"{accuracy_score(Y_TEST, gs.best_estimator_.predict(X_TEST_SCALED))*100:.2f}%"
-        })
-
-        # 2. RANDOM SEARCH
-        t_start = time.perf_counter()
-        try:
-            max_comb = int(np.prod([len(v) for v in param_grid.values()]))
-        except Exception:
-            max_comb = 1
-        n_iteraciones = max(1, min(8, max_comb))
-        
-        rs = RandomizedSearchCV(estimator, param_grid, n_iter=n_iteraciones, cv=3, scoring='accuracy', n_jobs=-1, random_state=42)
-        rs.fit(X_TRAIN_SCALED, Y_TRAIN)
-        t_random = time.perf_counter() - t_start
-        resultados_lista.append({
-            "estrategia": "Random Search (Muestreo)",
-            "tiempo": f"{t_random:.4f}s",
-            "test_acc": f"{accuracy_score(Y_TEST, rs.best_estimator_.predict(X_TEST_SCALED))*100:.2f}%"
-        })
-
-        # 3. OPTUNA
-        t_start = time.perf_counter()
-        def objective(trial):
-            params = {}
-            for param_name, valores in param_grid.items():
-                if any(isinstance(x, str) or isinstance(x, bool) for x in valores):
-                    params[param_name] = trial.suggest_categorical(param_name, valores)
-                else:
-                    if len(valores) == 1:
-                        params[param_name] = valores[0]
-                    else:
-                        p_min, p_max = min(valores), max(valores)
-                        if p_min == p_max:
-                            params[param_name] = p_min
-                        elif any(isinstance(x, float) for x in valores) or 'e' in str(p_min).lower():
-                            params[param_name] = trial.suggest_float(param_name, float(p_min), float(p_max))
-                        else:
-                            params[param_name] = trial.suggest_int(param_name, int(p_min), int(p_max))
-
-            if modelo_seleccionado == "Random Forest":
-                clf = RandomForestClassifier(**params, random_state=42)
-            elif modelo_seleccionado == "XGBoost":
-                clf = XGBClassifier(**params, objective='multi:softprob', random_state=42)
-            elif modelo_seleccionado == "Softmax Regression":
-                clf = LogisticRegression(**params, multi_class='multinomial', solver='lbfgs', max_iter=500, random_state=42)
-            else:
-                clf = GaussianNB(**params)
-            return cross_val_score(clf, X_TRAIN_SCALED, Y_TRAIN, cv=3, scoring='accuracy').mean()
-
-        study = optuna.create_study(direction="maximize")
-        study.optimize(objective, n_trials=10)
-        t_optuna = time.perf_counter() - t_start
-
-        if modelo_seleccionado == "Random Forest":
-            opt_clf = RandomForestClassifier(**study.best_params, random_state=42).fit(X_TRAIN_SCALED, Y_TRAIN)
-        elif modelo_seleccionado == "XGBoost":
-            opt_clf = XGBClassifier(**study.best_params, objective='multi:softprob', random_state=42).fit(X_TRAIN_SCALED, Y_TRAIN)
-        elif modelo_seleccionado == "Softmax Regression":
-            opt_clf = LogisticRegression(**study.best_params, multi_class='multinomial', solver='lbfgs', max_iter=500, random_state=42).fit(X_TRAIN_SCALED, Y_TRAIN)
-        else:
-            opt_clf = GaussianNB(**study.best_params).fit(X_TRAIN_SCALED, Y_TRAIN)
-
-        resultados_lista.append({
-            "estrategia": "Optuna (Muestreo Bayesiano)",
-            "tiempo": f"{t_optuna:.4f}s",
-            "test_acc": f"{accuracy_score(Y_TEST, opt_clf.predict(X_TEST_SCALED))*100:.2f}%"
-        })
-
-        nombre_optimizado = f"{modelo_seleccionado} (Optimizado)"
-        MODELOS_POOL[nombre_optimizado] = gs.best_estimator_
-        
-        y_pred = gs.best_estimator_.predict(X_TEST_SCALED)
-        y_train_pred = gs.best_estimator_.predict(X_TRAIN_SCALED)
-        
-        CACHED_DATA["modelos"][nombre_optimizado] = {
-            "train_acc": f"{accuracy_score(Y_TRAIN, y_train_pred)*100:.2f}%",
-            "test_acc": resultados_lista[0]["test_acc"],
-            "precision": f"{precision_score(Y_TEST, y_pred, average='macro')*100:.2f}%",
-            "recall": f"{recall_score(Y_TEST, y_pred, average='macro')*100:.2f}%",
-            "es_optimizado": True
-        }
-
-        pool_convertido_lista = []
-        for name, stats in CACHED_DATA["modelos"].items():
-            pool_convertido_lista.append({
-                "arquitectura": name, "train_acc": stats["train_acc"], "test_acc": stats["test_acc"], "precision": stats["precision"], "es_optimizado": stats.get("es_optimizado", False)
-            })
-
-        return jsonify({"status": "ok", "benchmark_lista": resultados_lista, "pool_lista": pool_convertido_lista})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-def evaluar_tipo_estricto(v_str):
-    v = v_str.strip()
-    if v.lower() == 'true': return True
-    if v.lower() == 'false': return False
-    try:
-        if 'e' in v.lower() or '.' in v: return float(v)
-        return int(v)
-    except ValueError:
-        return v
 
 @app.route("/api/predict-table", methods=["POST"])
 def predict_table():
@@ -390,5 +270,124 @@ def upload_csv():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route("/api/retrain", methods=["POST"])
+def retrain_and_benchmark():
+    try:
+        req = request.get_json()
+        modelo_seleccionado = req.get("model")
+        grid_raw_text = req.get("grid_text", "")
+        param_grid = {}
+        for linea in grid_raw_text.split("\n"):
+            if ":" in linea:
+                clave, valores = linea.split(":", 1)
+                param_grid[clave.strip()] = [evaluar_tipo_estricto(x) for x in valores.split(",")]
+        if modelo_seleccionado == "Random Forest":
+            estimator = RandomForestClassifier(random_state=42)
+        elif modelo_seleccionado == "XGBoost":
+            estimator = XGBClassifier(objective='multi:softprob', random_state=42)
+        elif modelo_seleccionado == "Softmax Regression":
+            estimator = LogisticRegression(multi_class='multinomial', solver='lbfgs', max_iter=500, random_state=42)
+        else:
+            estimator = GaussianNB()
+        resultados_lista = []
+        t_start = time.perf_counter()
+        gs = GridSearchCV(estimator, param_grid, cv=3, scoring='accuracy', n_jobs=-1)
+        gs.fit(X_TRAIN_SCALED, Y_TRAIN)
+        t_grid = time.perf_counter() - t_start
+        resultados_lista.append({
+            "estrategia": "Grid Search (Fuerza Bruta)",
+            "tiempo": f"{t_grid:.4f}s",
+            "test_acc": f"{accuracy_score(Y_TEST, gs.best_estimator_.predict(X_TEST_SCALED))*100:.2f}%"
+        })
+        t_start = time.perf_counter()
+        try:
+            max_comb = int(np.prod([len(v) for v in param_grid.values()]))
+        except Exception:
+            max_comb = 1
+        n_iteraciones = max(1, min(8, max_comb))
+        rs = RandomizedSearchCV(estimator, param_grid, n_iter=n_iteraciones, cv=3, scoring='accuracy', n_jobs=-1, random_state=42)
+        rs.fit(X_TRAIN_SCALED, Y_TRAIN)
+        t_random = time.perf_counter() - t_start
+        resultados_lista.append({
+            "estrategia": "Random Search (Muestreo)",
+            "tiempo": f"{t_random:.4f}s",
+            "test_acc": f"{accuracy_score(Y_TEST, rs.best_estimator_.predict(X_TEST_SCALED))*100:.2f}%"
+        })
+        t_start = time.perf_counter()
+        def objective(trial):
+            params = {}
+            for param_name, valores in param_grid.items():
+                if any(isinstance(x, str) or isinstance(x, bool) for x in valores):
+                    params[param_name] = trial.suggest_categorical(param_name, valores)
+                else:
+                    if len(valores) == 1:
+                        params[param_name] = valores[0]
+                    else:
+                        p_min, p_max = min(valores), max(valores)
+                        if p_min == p_max:
+                            params[param_name] = p_min
+                        elif any(isinstance(x, float) for x in valores) or 'e' in str(p_min).lower():
+                            params[param_name] = trial.suggest_float(param_name, float(p_min), float(p_max))
+                        else:
+                            params[param_name] = trial.suggest_int(param_name, int(p_min), int(p_max))
+            if modelo_seleccionado == "Random Forest":
+                clf = RandomForestClassifier(**params, random_state=42)
+            elif modelo_seleccionado == "XGBoost":
+                clf = XGBClassifier(**params, objective='multi:softprob', random_state=42)
+            elif modelo_seleccionado == "Softmax Regression":
+                clf = LogisticRegression(**params, multi_class='multinomial', solver='lbfgs', max_iter=500, random_state=42)
+            else:
+                clf = GaussianNB(**params)
+            return cross_val_score(clf, X_TRAIN_SCALED, Y_TRAIN, cv=3, scoring='accuracy').mean()
+        study = optuna.create_study(direction="maximize")
+        study.optimize(objective, n_trials=10)
+        t_optuna = time.perf_counter() - t_start
+        if modelo_seleccionado == "Random Forest":
+            opt_clf = RandomForestClassifier(**study.best_params, random_state=42).fit(X_TRAIN_SCALED, Y_TRAIN)
+        elif modelo_seleccionado == "XGBoost":
+            opt_clf = XGBClassifier(**study.best_params, objective='multi:softprob', random_state=42).fit(X_TRAIN_SCALED, Y_TRAIN)
+        elif modelo_seleccionado == "Softmax Regression":
+            opt_clf = LogisticRegression(**study.best_params, multi_class='multinomial', solver='lbfgs', max_iter=500, random_state=42).fit(X_TRAIN_SCALED, Y_TRAIN)
+        else:
+            opt_clf = GaussianNB(**study.best_params).fit(X_TRAIN_SCALED, Y_TRAIN)
+        resultados_lista.append({
+            "estrategia": "Optuna (Muestreo Bayesiano)",
+            "tiempo": f"{t_optuna:.4f}s",
+            "test_acc": f"{accuracy_score(Y_TEST, opt_clf.predict(X_TEST_SCALED))*100:.2f}%"
+        })
+        nombre_optimizado = f"{modelo_seleccionado} (Optimizado)"
+        MODELOS_POOL[nombre_optimizado] = gs.best_estimator_
+        y_pred = gs.best_estimator_.predict(X_TEST_SCALED)
+        y_train_pred = gs.best_estimator_.predict(X_TRAIN_SCALED)
+        CACHED_DATA["modelos"][nombre_optimizado] = {
+            "train_acc": f"{accuracy_score(Y_TRAIN, y_train_pred)*100:.2f}%",
+            "test_acc": resultados_lista[0]["test_acc"],
+            "precision": f"{precision_score(Y_TEST, y_pred, average='macro')*100:.2f}%",
+            "recall": f"{recall_score(Y_TEST, y_pred, average='macro')*100:.2f}%",
+            "es_optimizado": True
+        }
+        pool_convertido_lista = []
+        for name, stats in CACHED_DATA["modelos"].items():
+            pool_convertido_lista.append({
+                "arquitectura": name, "train_acc": stats["train_acc"], "test_acc": stats["test_acc"], "precision": stats["precision"], "es_optimizado": stats.get("es_optimizado", False)
+            })
+        return jsonify({"status": "ok", "benchmark_lista": resultados_lista, "pool_lista": pool_convertido_lista})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+def evaluar_tipo_estricto(v_str):
+    v = v_str.strip()
+    if v.lower() == 'true': return True
+    if v.lower() == 'false': return False
+    try:
+        if 'e' in v.lower() or '.' in v: return float(v)
+        return int(v)
+    except ValueError:
+        return v
+
+# if __name__ == "__main__":
+#     app.run(debug=True)
+    
+    #Para despliegue en producción:
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)

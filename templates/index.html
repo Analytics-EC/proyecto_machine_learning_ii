@@ -9,7 +9,7 @@
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <style>
         body, .v-application { background-color: #FAF8F6 !important; font-family: 'Roboto', sans-serif; }
-        .up-navbar { background-color: #FFFFFF !important; border-bottom: 2px solid #132B4F; }
+        .up-navbar { background-color: #FFFFFF !important; border-bottom: 2px solid #132B4F; box-shadow: none !important; }
         .up-card-premium {
             background: #FFFFFF !important;
             border: 1px solid rgba(19, 43, 79, 0.08) !important;
@@ -20,7 +20,6 @@
         .col-fija { width: 175px !important; min-width: 175px !important; max-width: 175px !important; padding: 4px !important; }
         .col-accion { width: 80px !important; min-width: 80px !important; max-width: 80px !important; padding: 4px !important; text-align: center !important; }
         .table-wrapper { border: 1px solid #E1E4E8; border-radius: 12px; overflow-x: auto !important; background: white; margin-top: 10px; }
-        .v-table { background: white !important; width: max-content !important; }
         .celda-input .v-field__input { padding-top: 4px !important; padding-bottom: 4px !important; font-size: 13px !important; text-align: center !important; }
         .code-grid .v-field__input { font-family: 'Courier New', Courier, monospace !important; background-color: #FFFDF9 !important; font-size: 14px !important; color: #8B1D2F !important; }
         .text-verde-premium { color: #2E7D32 !important; font-weight: bold !important; }
@@ -32,44 +31,60 @@
     <div id="app">
         <v-app style="background: transparent;">
             
-            <div class="up-navbar pa-4 d-flex align-center justify-space-between flex-wrap">
+            <v-app-bar class="up-navbar px-4" height="125" fixed flat>
                 <div class="d-flex align-center">
-                    <v-img src="{{ url_for('static', filename='logo_up.png') }}" max-height="65" style="width: 240px; min-width: 240px;" class="mr-6"></v-img>
-                    <div>
-                        <h1 class="text-h4 font-weight-bold text-navy" style="font-family: 'Montserrat', sans-serif; letter-spacing: -0.5px;">
-                            Laboratorio de Machine Learning 2
-                        </h1>
+                    <v-img src="{{ url_for('static', filename='logo_up.png') }}" max-height="175" style="width: 200px; min-width: 200px;" class="mr-4"></v-img>
+                    <div class="hidden-sm-and-down">
+                        <h1 class="text-h5 font-weight-bold text-navy" style="font-family: 'Montserrat', sans-serif;">Laboratorio de Machine Learning 2</h1>
                         <p class="text-caption text-grey-darken-2 mb-0">Profesor: <strong class="text-guinda" v-text="professorName"></strong></p>
                     </div>
                 </div>
+                
+                <v-spacer></v-spacer>
 
-                <v-tabs v-model="activeTab" color="#8B1D2F" @update:model-value="manejarCambioTab">
-                    <v-tab value="proyecciones"><v-icon start icon="mdi-chart-scatter-plot"></v-icon>Proyecciones</v-tab>
-                    <v-tab value="modelos"><v-icon start icon="mdi-brain"></v-icon>Catálogo Académico</v-tab>
-                    <v-tab value="xai"><v-icon start icon="mdi-eye-outline"></v-icon>Explicabilidad (XAI)</v-tab>
-                    <v-tab value="editor"><v-icon start icon="mdi-table-edit"></v-icon>Módulo de Inferencia (.csv)</v-tab>
-                    <v-tab value="retrain"><v-icon start icon="mdi-gauge"></v-icon>Optimización (Optuna)</v-tab>
-                    <v-tab value="equipo"><v-icon start icon="mdi-account-group"></v-icon>Equipo</v-tab>
+                <v-tabs v-model="activeTab" color="#8B1D2F" class="hidden-sm-and-down" @update:model-value="manejarCambioTab">
+                    <v-tab value="intro">Introducción</v-tab>
+                    <v-tab value="modelos">Catálogo</v-tab>
+                    <v-tab value="xai">Explicabilidad (XAI)</v-tab>
+                    <v-tab value="editor">Inferencia</v-tab>
+                    <v-tab value="retrain">Optimización</v-tab>
+                    <v-tab value="proyecciones">Clusters Dinámicos</v-tab>
+                    <v-tab value="equipo">Equipo</v-tab>
                 </v-tabs>
-            </div>
 
-            <v-main class="pt-6">
+                <v-menu transition="scale-transition">
+                    <template v-slot:activator="{ props }">
+                        <v-btn icon="mdi-menu" color="#132B4F" v-bind="props" class="hidden-md-and-up"></v-btn>
+                    </template>
+                    <v-list bg-color="white" width="220" class="rounded-lg shadow-xl">
+                        <v-list-item v-for="t in itemsMenuMovi" :key="t.val" @click="activeTab = t.val; manejarCambioTab(t.val)">
+                            <v-list-item-title class="text-navy font-weight-bold" v-text="t.lbl"></v-list-item-title>
+                        </v-list-item>
+                    </v-list>
+                </v-menu>
+            </v-app-bar>
+
+            <v-main style="margin-top: 120px;">
                 <v-container fluid class="px-8">
                     <v-window v-model="activeTab">
                         
-                        <v-window-item value="proyecciones">
+                        <v-window-item value="intro">
                             <v-row>
-                                <v-col cols="12">
-                                    <v-card class="up-card-premium pa-6" elevation="0">
-                                        <div class="d-flex justify-space-between align-center mb-4 flex-wrap">
-                                            <div><h3 class="text-h6 font-weight-bold text-navy">Reducción Espacial Inteligente del Dataset</h3></div>
-                                            <v-btn-toggle v-model="algoritmoDim" mandatory color="#132B4F" variant="tonal" rounded="lg" @update:model-value="dibujarGrafico">
-                                                <v-btn value="pca" size="small">PCA</v-btn>
-                                                <v-btn value="tsne" size="small">t-SNE</v-btn>
-                                                <v-btn value="umap" size="small">UMAP</v-btn>
-                                            </v-btn-toggle>
-                                        </div>
-                                        <div id="plotly-chart-area" style="width: 100%; height: 480px;"></div>
+                                <v-col cols="12" md="7">
+                                    <v-card class="up-card-premium pa-6 mb-4" elevation="0">
+                                        <div class="text-h5 font-weight-bold text-navy mb-2">Objetivo del Laboratorio</div>
+                                        <p class="text-body-1 text-grey-darken-3 mb-6">Evaluar, optimizar mediante algoritmos bayesianos y auditar bajo técnicas de explicabilidad (XAI) un pool multiparámetrico de clasificadores supervisados entrenados con el dataset físico-químico Wine, contrastando la consistencia de sus fronteras mediante reducción de dimensionalidad espacial.</p>
+                                        <div class="text-subtitle-1 font-weight-bold text-navy mb-2">Mapa de Operación de la Suite</div>
+                                        <div class="text-body-2 mb-2"><strong>1. Catálogo Académico:</strong> Análisis teórico profundo de hiperparámetros junto a accesos directos a papers indexados.</div>
+                                        <div class="text-body-2 mb-2"><strong>2. Explicabilidad (XAI):</strong> Auditoría global mediante Permutation Importance y análisis local detallado con PDP, ICE y SHAP Values.</div>
+                                        <div class="text-body-2 mb-2"><strong>3. Inferencia de Matrices:</strong> Workspace dinámico para evaluar lotes químicos mediante archivos .csv planos.</div>
+                                    </v-card>
+                                </v-col>
+                                <v-col cols="12" md="5">
+                                    <v-card class="up-card-premium pa-6" elevation="0" style="border-top: 5px solid #8B1D2F !important;">
+                                        <div class="text-h5 font-weight-bold text-guinda mb-2">Conclusiones Científicas</div>
+                                        <p class="text-body-2 text-grey-darken-3 mb-3">• Los ensambles complejos como <strong>Random Forest y XGBoost</strong> demuestran una inmunidad superior frente a interacciones no lineales de alta dimensión, validando su hegemonía.</p>
+                                        <p class="text-body-2 text-grey-darken-3 mb-3">• El reentrenamiento bayesiano implementado a través de <strong>Optuna</strong> optimiza los hiperparámetros críticos en una fracción del tiempo de cómputo.</p>
                                     </v-card>
                                 </v-col>
                             </v-row>
@@ -97,9 +112,8 @@
                                         </v-carousel-item>
                                     </v-carousel>
                                 </v-col>
-
                                 <v-col cols="12" md="6">
-                                    <div class="text-h6 font-weight-bold text-navy mb-3"><v-icon start icon="mdi-chart-timeline-variant" color="#8B1D2F"></v-icon> Rendimiento del Servidor</div>
+                                    <div class="text-h6 font-weight-bold text-navy mb-3"><v-icon start icon="mdi-chart-timeline-variant" color="#8B1D2F"></v-icon>Métricas</div>
                                     <v-row>
                                         <v-col cols="12" sm="6" v-for="(stats, name) in mlData.modelos" :key="name" class="pb-2">
                                             <v-card class="up-card-premium pa-4" elevation="0" style="border-left: 5px solid #8B1D2F !important;">
@@ -119,7 +133,6 @@
                                     </v-row>
                                 </v-col>
                             </v-row>
-
                             <v-dialog v-model="dialogoHps" max-width="750px" scrollable>
                                 <v-card class="rounded-xl pa-4">
                                     <v-card-title class="text-h5 font-weight-bold text-navy d-flex align-center justify-space-between">
@@ -152,45 +165,35 @@
                                 <v-col cols="12" md="4">
                                     <v-card class="up-card-premium pa-6" elevation="0">
                                         <div class="text-h6 font-weight-bold text-navy mb-1">Centro de Explicabilidad</div>
-                                        <p class="text-caption text-grey mb-6">Selecciona el estimador y la variable para auditar el comportamiento e impacto global.</p>
-                                        
+                                        <p class="text-caption text-grey mb-6">Selecciona el estimador y la variable para auditar el comportamiento global.</p>
                                         <v-select v-model="modeloSeleccionadoXAI" :items="['Random Forest', 'XGBoost', 'Naive Bayes', 'Softmax Regression']" label="Arquitectura de Análisis" variant="outlined" color="#132B4F" density="comfortable" class="mb-4" @update:model-value="calcularPipelineCompletoXAI"></v-select>
                                         <v-select v-model="featureSeleccionadaXAI" :items="headersFeatures" label="Variable Química (PDP / ICE)" variant="outlined" color="#8B1D2F" density="comfortable" class="mb-4" @update:model-value="calcularParcialDependenceXAI"></v-select>
-                                        
-                                        <v-divider class="my-4"></v-divider>
-                                        
-                                        <div class="text-subtitle-2 font-weight-bold text-navy mb-2">Glosario de Métricas Teóricas:</div>
-                                        <div class="text-caption text-grey-darken-3 mb-2"><strong>Permutation Importance:</strong> Mide la caída del Accuracy al barajar una variable. Las barras de error muestran la estabilidad en 5 repeticiones.</div>
-                                        <div class="text-caption text-grey-darken-3 mb-2"><strong>PDP (Curva Azul):</strong> Muestra el impacto marginal promedio de la variable sobre la probabilidad de la clase de vino.</div>
-                                        <div class="text-caption text-grey-darken-3"><strong>ICE (Líneas Grises):</strong> Muestran la heterogeneidad de las predicciones fila por fila para capturar efectos de interacción.</div>
                                     </v-card>
                                 </v-col>
-
                                 <v-col cols="12" md="8">
                                     <v-row>
                                         <v-col cols="12" sm="6">
                                             <v-card class="up-card-premium pa-4" elevation="0">
-                                                <div class="text-subtitle-2 font-weight-bold text-navy mb-2"><v-icon start icon="mdi-matrix" color="#132B4F"></v-icon> Permutation Importance (5 Repeticiones)</div>
+                                                <div class="text-subtitle-2 font-weight-bold text-navy mb-2">Permutation Importance</div>
                                                 <div id="chart-permutation-importance" style="width:100%; height:320px;"></div>
                                             </v-card>
                                         </v-col>
                                         <v-col cols="12" sm="6">
                                             <v-card class="up-card-premium pa-4" elevation="0">
-                                                <div class="text-subtitle-2 font-weight-bold text-navy mb-2"><v-icon start icon="mdi-chart-bell-curve" color="#8B1D2F"></v-icon> PDP & ICE: <span v-text="featureSeleccionadaXAI"></span></div>
+                                                <div class="text-subtitle-2 font-weight-bold text-navy mb-2">PDP & ICE: <span v-text="featureSeleccionadaXAI"></span></div>
                                                 <div id="chart-pdp-ice" style="width:100%; height:320px;"></div>
                                             </v-card>
                                         </v-col>
                                     </v-row>
-
                                     <v-row class="mt-2">
                                         <v-col cols="12">
                                             <v-card class="up-card-premium pa-4" elevation="0">
                                                 <div class="d-flex justify-space-between align-center mb-2 flex-wrap">
-                                                    <div class="text-subtitle-2 font-weight-bold text-navy"><v-icon start icon="mdi-eye" color="#2E7D32"></v-icon> Análisis de Contribución de SHAP Values</div>
+                                                    <div class="text-subtitle-2 font-weight-bold text-navy">Análisis de Contribución de SHAP Values</div>
                                                     <v-btn-toggle v-model="tipoVisualizacionSHAP" mandatory color="#2E7D32" variant="tonal" rounded="lg" @update:model-value="renderizarGraficosSHAP">
-                                                        <v-btn value="barras" size="small">Global Importance</v-btn>
-                                                        <v-btn value="beeswarm" size="small">Beeswarm Density</v-btn>
-                                                        <v-btn value="dependencia" size="small">Dependencia SHAP</v-btn>
+                                                        <v-btn value="barras" size="small">Importance</v-btn>
+                                                        <v-btn value="beeswarm" size="small">Beeswarm</v-btn>
+                                                        <v-btn value="dependencia" size="small">Dependencia</v-btn>
                                                     </v-btn-toggle>
                                                 </div>
                                                 <div id="chart-shap-workspace" style="width:100%; height:340px;"></div>
@@ -206,8 +209,9 @@
                                 <v-col cols="12">
                                     <v-card class="up-card-premium pa-6" elevation="0">
                                         <div class="text-h6 font-weight-bold text-navy mb-1">Módulo de Inferencia y Edición de Matrices</div>
-                                        <p class="text-caption text-grey mb-4">Ingresa parámetros químicos en la tabla de características y observa los resultados predictivos calculados por el backend en la sección de inferencias.</p>
-                                        <v-file-input label="Cargar archivo .csv" variant="outlined" color="#8B1D2F" density="comfortable" prepend-icon="mdi-cloud-upload" @update:model-value="enviarCSVAlServidor" class="mb-2"></v-file-input>
+                                        <p class="text-caption text-grey mb-4">Ingresa parámetros químicos en la tabla de características y observa los resultados predictivos calculados por el backend.</p>
+                                        
+                                        <v-file-input label="Cargar archivo .csv plano" variant="outlined" color="#8B1D2F" density="comfortable" prepend-icon="mdi-cloud-upload" @change="cargarArchivoCSVEspecifico" class="mb-2"></v-file-input>
                                         
                                         <v-row class="mb-4 mt-2">
                                             <v-col cols="12" sm="6" md="3"><v-btn color="success" variant="flat" prepend-icon="mdi-plus" block class="text-capitalize font-weight-bold" @click="agregarFilaVacia">Añadir Fila</v-btn></v-col>
@@ -216,7 +220,7 @@
                                             <v-col cols="12" sm="6" md="3"><v-btn color="#8B1D2F" variant="flat" prepend-icon="mdi-calculator" block class="text-capitalize font-weight-bold" @click="procesarInferenciaManual" :loading="cargandoInferencia">Calcular Inferencia</v-btn></v-col>
                                         </v-row>
 
-                                        <div class="text-subtitle-2 font-weight-bold text-navy mt-4 mb-2 d-flex align-center"><v-icon color="#132B4F" start icon="mdi-beaker-outline" class="mr-2"></v-icon>1. Matriz de Características Químicas de Entrada (Features $X$)</div>
+                                        <div class="text-subtitle-2 font-weight-bold text-navy mt-4 mb-2 d-flex align-center">1. Matriz de Entrada (Features $X$)</div>
                                         <div class="table-wrapper mb-6">
                                             <table class="v-table v-table--density-compact" style="width: max-content !important;">
                                                 <thead>
@@ -234,19 +238,17 @@
                                             </table>
                                         </div>
 
-                                        <div class="text-subtitle-2 font-weight-bold text-guinda mt-4 mb-2 d-flex align-center"><v-icon color="#8B1D2F" start icon="mdi-brain" class="mr-2"></v-icon>2. Resultados de las Predicciones Generadas</div>
+                                        <div class="text-subtitle-2 font-weight-bold text-guinda mt-4 mb-2 d-flex align-center">2. Resultados de las Predicciones Generadas</div>
                                         <div class="table-wrapper">
                                             <table class="v-table v-table--density-compact" style="width: max-content !important;">
                                                 <thead>
                                                     <tr class="bg-red-lighten-5">
                                                         <th v-for="h in headersPredictions" :key="h" class="font-weight-bold text-guinda text-center col-fija" style="border-bottom: 2px solid #8B1D2F;" v-text="h.replace('PRED_', '')"></th>
-                                                        <th class="font-weight-bold text-guinda text-center col-accion" style="border-bottom: 2px solid #8B1D2F;">Estado</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     <tr v-for="(row, idx) in rows" :key="idx">
                                                         <td v-for="h in headersPredictions" :key="h" class="col-fija text-center"><v-chip size="small" :color="row[h] ? '#132B4F' : 'grey-darken-1'" variant="flat" class="font-weight-bold w-100 justify-center" v-text="row[h] || 'Esperando cálculo'"></v-chip></td>
-                                                        <td class="col-accion text-center"><v-icon size="small" :color="row[headersPredictions[0]] ? 'success' : 'grey'" :icon="row[headersPredictions[0]] ? 'mdi-check-circle' : 'mdi-clock-outline'"></v-icon></td>
                                                     </tr>
                                                 </tbody>
                                             </table>
@@ -261,82 +263,122 @@
                                 <v-col cols="12" md="4">
                                     <v-card class="up-card-premium pa-6" elevation="0">
                                         <div class="text-h6 font-weight-bold text-navy mb-1">Módulo de Reentrenamiento</div>
-                                        <p class="text-caption text-grey mb-6">Modifica la malla. Al cambiar el estimador, los hiperparámetros se adaptarán de forma automática.</p>
-                                        
+                                        <p class="text-caption text-grey mb-6">Modifica los hiperparámetros numéricos en la grilla para lanzar la optimización bayesiana.</p>
                                         <v-select v-model="modeloReentrenar" :items="['Random Forest', 'XGBoost', 'Softmax Regression', 'Naive Bayes']" label="Modelo Base para Optimizar" variant="outlined" color="#132B4F" density="comfortable" class="mb-4" @update:model-value="cambiarHiperparametrosPorDefecto"></v-select>
                                         <v-textarea v-model="grillaTextoUsuario" label="Hiperparámetros a evaluar" variant="outlined" color="#8B1D2F" rows="5" class="code-grid mt-2" hide-details></v-textarea>
-                                        
-                                        <v-btn color="#8B1D2F" variant="flat" prepend-icon="mdi-timer-flash" size="large" block class="text-capitalize mt-6 text-white font-weight-bold" @click="ejecutarBenchmarkMallas" :loading="ejecutandoGridSearch">
-                                            Reentrenar Y Comparar Eficacia
-                                        </v-btn>
+                                        <v-btn color="#8B1D2F" variant="flat" prepend-icon="mdi-timer-flash" size="large" block class="text-capitalize mt-6 text-white font-weight-bold" @click="ejecutarBenchmarkMallas" :loading="ejecutandoGridSearch">Reentrenar Y Comparar Eficacia</v-btn>
                                     </v-card>
                                 </v-col>
 
                                 <v-col cols="12" md="8">
                                     <v-card class="up-card-premium pa-6 mb-4" elevation="0">
+                                        <div class="text-subtitle-1 font-weight-bold text-navy mb-3">1. Tabla Comparativa de Eficiencia en Tiempo</div>
                                         
-                                        <div class="text-subtitle-1 font-weight-bold text-navy mb-3"><v-icon start icon="mdi-chart-bar" color="#132B4F"></v-icon>1. Tabla Comparativa de Eficiencia en Tiempo</div>
-                                        
-                                        <div class="table-wrapper mb-6" style="border: 1px solid #E1E4E8; border-radius:12px;">
-                                            <table class="v-table v-table--density-compact" style="width: max-content !important; border-collapse: collapse;">
+                                        <div class="table-wrapper mb-6" style="border: 1px solid #E1E4E8; border-radius: 12px; width: 100%; overflow: hidden;">
+                                            <table id="tabla-tiempos-opt" style="width: 100% !important; table-layout: fixed; border-collapse: collapse; background: white;">
                                                 <thead>
                                                     <tr class="bg-grey-lighten-4">
-                                                        <th class="font-weight-bold text-navy text-left col-fija" style="border-bottom: 2px solid #132B4F;">Estrategia / Optimizador</th>
-                                                        <th class="font-weight-bold text-navy text-center col-fija" style="border-bottom: 2px solid #132B4F;">Tiempo de Cómputo</th>
-                                                        <th class="font-weight-bold text-navy text-center col-fija" style="border-bottom: 2px solid #132B4F;">Test Accuracy</th>
+                                                        <th class="font-weight-bold text-navy text-left pl-4" style="width: 45%; padding: 12px; border-bottom: 2px solid #132B4F;">Estrategia / Optimizador</th>
+                                                        <th class="font-weight-bold text-navy text-center" style="width: 30%; padding: 12px; border-bottom: 2px solid #132B4F;">Tiempo de Cómputo</th>
+                                                        <th class="font-weight-bold text-navy text-center" style="width: 25%; padding: 12px; border-bottom: 2px solid #132B4F; text-align: center;">Test Accuracy</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    <template v-if="dataBenchmarkResp">
-                                                        <tr v-for="item in dataBenchmarkResp" :key="item.estrategia">
-                                                            <td class="font-weight-bold text-grey-darken-3 text-left col-fija" v-text="item.estrategia"></td>
-                                                            <td class="text-center col-fija">
-                                                                <v-chip size="small" :color="item.estrategia.includes('Grid') ? 'error' : (item.estrategia.includes('Random') ? 'warning' : 'success')" variant="flat" class="font-weight-bold">
-                                                                    <v-icon start icon="mdi-clock-outline" class="mr-1"></v-icon>
-                                                                    <span v-text="item.tiempo"></span>
-                                                                </v-chip>
+                                                    <template v-if="dataBenchmarkResp && dataBenchmarkResp.length">
+                                                        <tr v-for="item in dataBenchmarkResp" :key="item.estrategia" style="border-bottom: 1px solid #E1E4E8;">
+                                                            <td class="font-weight-bold text-grey-darken-3 text-left pl-4" style="width: 45%; padding: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" v-text="item.estrategia"></td>
+                                                            <td class="text-center" style="width: 30%; padding: 12px;">
+                                                                <v-chip size="small" :color="item.estrategia.includes('Grid') ? 'error' : (item.estrategia.includes('Random') ? 'warning' : 'success')" variant="flat" class="font-weight-bold"><v-icon start icon="mdi-clock-outline" class="mr-1"></v-icon><span v-text="item.tiempo"></span></v-chip>
                                                             </td>
-                                                            <td class="text-center font-weight-bold text-navy text-body-1 col-fija" v-text="item.test_acc"></td>
+                                                            <td class="text-center font-weight-bold text-navy text-body-1" style="width: 25%; padding: 12px; text-align: center;" v-text="item.test_acc"></td>
                                                         </tr>
                                                     </template>
-                                                    <tr v-else>
-                                                        <td colspan="3" class="text-center text-grey-darken-1 py-8 text-caption col-fija">
+                                                    <tr v-else style="border-bottom: 1px solid #E1E4E8;">
+                                                        <td colspan="3" class="text-center text-grey-darken-1 py-8 text-caption" style="padding: 24px;">
                                                             <v-icon icon="mdi-information-outline" class="mr-1" color="grey"></v-icon>
-                                                            Configura la grilla a la izquierda y presiona el botón para calcular los costeos de tiempo de Optuna.
+                                                            Configura la grilla a la izquierda y presiona el botón.
                                                         </td>
                                                     </tr>
                                                 </tbody>
                                             </table>
                                         </div>
 
-                                        <div class="text-subtitle-1 font-weight-bold text-navy mb-3"><v-icon start icon="mdi-balance" color="#8B1D2F"></v-icon>2. Comparativa de Modelos Actuales del Pool</div>
+                                        <div class="text-subtitle-1 font-weight-bold text-navy mb-3">2. Comparativa de Modelos Actuales del Pool</div>
                                         
-                                        <div class="table-wrapper" style="border: 1px solid #E1E4E8; border-radius:12px;">
-                                            <table class="v-table v-table--density-compact" style="width: max-content !important; border-collapse: collapse;">
+                                        <div class="table-wrapper" style="border: 1px solid #E1E4E8; border-radius:12px; width: 100%;">
+                                            <table id="tabla-pool-opt" class="v-table" style="width: 100% !important; table-layout: fixed; border-collapse: collapse;">
                                                 <thead>
                                                     <tr class="bg-red-lighten-5">
-                                                        <th class="font-weight-bold text-guinda text-left col-fija" style="border-bottom: 2px solid #8B1D2F;">Arquitectura del Sistema</th>
-                                                        <th class="font-weight-bold text-guinda text-center col-fija" style="border-bottom: 2px solid #8B1D2F;">Train Acc</th>
-                                                        <th class="font-weight-bold text-guinda text-center col-fija" style="border-bottom: 2px solid #8B1D2F;">Test Acc</th>
-                                                        <th class="font-weight-bold text-guinda text-center col-fija" style="border-bottom: 2px solid #8B1D2F;">Precision</th>
+                                                        <th class="font-weight-bold text-guinda text-left pl-4" style="width: 40%; padding: 12px; border-bottom: 2px solid #8B1D2F;">Arquitectura del Sistema</th>
+                                                        <th class="font-weight-bold text-guinda text-center" style="width: 20%; padding: 12px; border-bottom: 2px solid #8B1D2F;">Train Acc</th>
+                                                        <th class="font-weight-bold text-guinda text-center" style="width: 20%; padding: 12px; border-bottom: 2px solid #8B1D2F;">Test Acc</th>
+                                                        <th class="font-weight-bold text-guinda text-center" style="width: 20%; padding: 12px; border-bottom: 2px solid #8B1D2F;">Precision</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    <template v-if="listaPoolDinamica.length">
-                                                        <tr v-for="m in listaPoolDinamica" :key="m.arquitectura">
-                                                            <td :class="['text-left col-fija', m.es_optimizado ? 'text-verde-premium' : 'font-weight-bold text-grey-darken-3']"><span v-text="m.arquitectura"></span></td>
-                                                            <td :class="['text-center text-body-2 col-fija', m.es_optimizado ? 'text-verde-premium' : '']" v-text="m.train_acc"></td>
-                                                            <td :class="['text-center text-body-1 col-fija', m.es_optimizado ? 'text-verde-premium' : 'font-weight-bold text-navy']" v-text="m.test_acc"></td>
-                                                            <td :class="['text-center text-body-2 col-fija', m.es_optimizado ? 'text-verde-premium' : '']" v-text="m.precision"></td>
-                                                        </tr>
-                                                    </template>
-                                                    <tr v-else>
-                                                        <td colspan="4" class="text-center text-grey py-6 col-fija">Cargando pool de modelos del laboratorio...</td>
+                                                    <tr v-for="m in listaPoolDinamica" :key="m.arquitectura" style="border-bottom: 1px solid #E1E4E8;">
+                                                        <td :class="['text-left pl-4', m.es_optimizado ? 'text-verde-premium' : 'font-weight-bold text-grey-darken-3']" style="padding: 12px;"><span v-text="m.arquitectura"></span></td>
+                                                        <td :class="['text-center text-body-2', m.es_optimizado ? 'text-verde-premium' : '']" style="padding: 12px;" v-text="m.train_acc"></td>
+                                                        <td :class="['text-center text-body-1', m.es_optimizado ? 'text-verde-premium' : 'font-weight-bold text-navy']" style="padding: 12px;" v-text="m.test_acc"></td>
+                                                        <td :class="['text-center text-body-2', m.es_optimizado ? 'text-verde-premium' : '']" style="padding: 12px;" v-text="m.precision"></td>
                                                     </tr>
                                                 </tbody>
                                             </table>
                                         </div>
+                                    </v-card>
+                                </v-col>
+                            </v-row>
+                        </v-window-item>
 
+                        <v-window-item value="proyecciones">
+                            <v-row>
+                                <v-col cols="12" md="4">
+                                    <v-card class="up-card-premium pa-5 mb-4" elevation="0">
+                                        <div class="text-subtitle-1 font-weight-bold text-navy mb-3"><v-icon start icon="mdi-tune" color="#132B4F"></v-icon> Parámetros de Reducción</div>
+                                        <div class="d-flex justify-space-between align-center mb-4 flex-wrap">
+                                            <span class="text-subtitle-2 text-navy font-weight-bold">Algoritmo Activo:</span>
+                                            <v-btn-toggle v-model="algoritmoDim" mandatory color="#132B4F" variant="tonal" rounded="lg" @update:model-value="refrescarClustersDinamicamente">
+                                                <v-btn value="pca" size="small">PCA</v-btn>
+                                                <v-btn value="tsne" size="small">t-SNE</v-btn>
+                                                <v-btn value="umap" size="small">UMAP</v-btn>
+                                            </v-btn-toggle>
+                                        </div>
+                                        
+                                        <template v-if="algoritmoDim === 'pca'">
+                                            <v-slider v-model="hpsProyecciones.pca_components" :min="2" :max="5" :step="1" label="PCA N-Components" thumb-label color="#132B4F" @end="refrescarClustersDinamicamente"></v-slider>
+                                            <v-select v-model="hpsProyecciones.pca_solver" :items="['auto', 'full', 'arpack', 'randomized']" label="SVD Solver Matricial" variant="outlined" density="comfortable" color="#132B4F" @update:model-value="refrescarClustersDinamicamente"></v-select>
+                                        </template>
+
+                                        <v-slider v-if="algoritmoDim === 'tsne'" v-model="hpsProyecciones.tsne_perplexity" :min="5" :max="50" :step="1" label="t-SNE Perplexity" thumb-label color="#8B1D2F" class="mt-2" @end="refrescarClustersDinamicamente"></v-slider>
+                                        <template v-if="algoritmoDim === 'umap'">
+                                            <v-slider v-model="hpsProyecciones.umap_neighbors" :min="2" :max="60" :step="1" label="UMAP Neighbors" thumb-label color="#2E7D32" @end="refrescarClustersDinamicamente"></v-slider>
+                                            <v-slider v-model="hpsProyecciones.umap_min_dist" :min="0.0" :max="0.9" :step="0.05" label="UMAP Min Dist" thumb-label color="#2E7D32" @end="refrescarClustersDinamicamente"></v-slider>
+                                        </template>
+                                    </v-card>
+
+                                    <v-card v-if="algoritmoDim === 'pca'" class="up-card-premium pa-5" elevation="0" style="border-top: 5px solid #132B4F !important;">
+                                        <div class="text-h6 font-weight-bold text-navy mb-1">PCA (Principal Component Analysis)</div>
+                                        <div class="text-caption text-guinda font-weight-bold mb-2">Paper: Karl Pearson (1901)</div>
+                                        <p class="text-body-2 text-grey-darken-3 mb-3"><strong>Fórmula Fundamental:</strong> Descompone ortogonalmente los valores propios de la matriz de covarianza para proyectar las características sobre vectores de varianza máxima.</p>
+                                        <v-btn size="small" color="#132B4F" variant="outlined" block href="https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html" target="_blank" class="mt-3">Documentación Scikit-Learn</v-btn>
+                                    </v-card>
+
+                                    <v-card v-if="algoritmoDim === 'tsne'" class="up-card-premium pa-5" elevation="0" style="border-top: 5px solid #8B1D2F !important;">
+                                        <div class="text-h6 font-weight-bold text-guinda mb-1">t-SNE (Stochastic Neighbor Embedding)</div>
+                                        <div class="text-caption text-navy font-weight-bold mb-2">Paper: Laurens van der Maaten & Hinton (2008)</div>
+                                        <v-btn size="small" color="#8B1D2F" variant="outlined" block href="https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html" target="_blank">Documentación Scikit-Learn</v-btn>
+                                    </v-card>
+
+                                    <v-card v-if="algoritmoDim === 'umap'" class="up-card-premium pa-5" elevation="0" style="border-top: 5px solid #2E7D32 !important;">
+                                        <div class="text-h6 font-weight-bold text-success mb-1">UMAP (Uniform Manifold Approximation)</div>
+                                        <div class="text-caption text-navy font-weight-bold mb-2">Paper: Leland McInnes & John Healy (2018)</div>
+                                        <v-btn size="small" color="#2E7D32" variant="outlined" block href="https://umap-learn.readthedocs.io/" target="_blank">Documentación Oficial UMAP</v-btn>
+                                    </v-card>
+                                </v-col>
+
+                                <v-col cols="12" md="8">
+                                    <v-card class="up-card-premium pa-6" elevation="0">
+                                        <div id="plotly-chart-area" style="width: 100%; height: 470px;"></div>
                                     </v-card>
                                 </v-col>
                             </v-row>
@@ -373,7 +415,7 @@
 
         createApp({
             setup() {
-                const activeTab = ref('editor'); 
+                const activeTab = ref('intro'); 
                 const algoritmoDim = ref('pca');
                 const mlData = ref({ modelos: {}, clases: [], puntos: [] });
                 const cargandoInferencia = ref(false);
@@ -397,18 +439,47 @@
                 const tipoVisualizacionSHAP = ref('barras');
                 const cacheDatosSHAP = ref(null);
 
+                const itemsMenuMovi = [
+                    { lbl: 'Introducción', val: 'intro' }, { lbl: 'Catálogo', val: 'modelos' },
+                    { lbl: 'Explicabilidad', val: 'xai' }, { lbl: 'Inferencia', val: 'editor' },
+                    { lbl: 'Optimización', val: 'retrain' }, { lbl: 'Clusters', val: 'proyecciones' },
+                    { lbl: 'Equipo', val: 'equipo' }
+                ];
+
+                const headersFeatures = [
+                    'alcohol', 'malic_acid', 'ash', 'alcalinity_of_ash', 'magnesium', 
+                    'total_phenols', 'flavanoids', 'nonflavanoid_phenols', 'proanthocyanidins', 
+                    'color_intensity', 'hue', 'od280_od315_of_diluted_wines', 'proline'
+                ];
+
+                // REPARACIÓN COMPLETA: Declaradas y expuestas de manera explícita ambas cabeceras predictivas requeridas por el DOM
+                const headersPredictions = [
+                    'PRED_RANDOM_FOREST', 'PRED_XGBOOST', 'PRED_NAIVE_BAYES', 'PRED_SOFTMAX_REGRESSION'
+                ];
+
+                const hpsProyecciones = ref({ tsne_perplexity: 15, umap_neighbors: 15, umap_min_dist: 0.1, pca_components: 2, pca_solver: "auto" });
+                const cachePuntosProyecciones = ref([]);
+
                 const professorName = ref("Dr. León Palafox");
+
+                const integrantes = [
+                    { nombre: 'Jhosse Paul Márquez Ruiz', email: '0287289@up.edu.mx' },
+                    { nombre: 'César Augusto Pérez Rosas', email: '0287285@up.edu.mx' },
+                    { nombre: 'Gerardo David Rivero Rique', email: '0287274@up.edu.mx' },
+                    { nombre: 'Luis Antonio Mani Yáñez', email: '0287239@up.edu.mx' },
+                    { nombre: 'Oscar Barranco Velázquez', email: '0287244@up.edu.mx' }
+                ];
 
                 const catalogoModelosExplicativos = {
                     "Random Forest": {
                         paper_autor: "Leo Breiman (2001) - Machine Learning Journal",
-                        descripcion: "Algoritmo de ensamble supervisado compuesto por múltiples árboles de decisión independientes (bagging). Mitiga la varianza promediando predicciones probabilísticas.",
+                        descripcion: "Algoritmo de ensamble supervisado compuesto por múltiples árboles de decisión independientes entrenados mediante bagging.",
                         fortalezas: "Resistente a valores atípicos y excelente mapeo de fronteras no lineales complejas.",
                         link_doc: "https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html",
                         link_paper: "https://link.springer.com/article/10.1023/A:1010933404324",
                         hps: [
-                            { param: "n_estimators", rango: "Rango sugerido: 50 a 500 [Entero]", def: "Cantidad total de árboles de decisión independientes a instanciar en el ensamble." },
-                            { param: "max_depth", rango: "Rango: 3 a 20 o None [Entero]", def: "Límite máximo de ramificaciones jerárquicas verticales permitidas en cada árbol del bosque." },
+                            { param: "n_estimators", rango: "50 a 500 [Entero]", def: "Cantidad total de árboles de decisión independientes a instanciar en el ensamble." },
+                            { param: "max_depth", rango: "3 a 20 o None [Entero]", def: "Límite máximo de ramificaciones jerárquicas verticales permitidas en cada árbol." },
                             { param: "criterion", rango: "Opciones: 'gini', 'entropy', 'log_loss'", def: "Función matemática para cuantificar la impureza o ganancia de información en cada split." },
                             { param: "min_samples_split", rango: "Rango: 2 a 12 [Entero]", def: "Muestras mínimas requeridas en un nodo interno para permitir una nueva división divisional." },
                             { param: "min_samples_leaf", rango: "Rango: 1 a 10 [Entero]", def: "Cantidad mínima de observaciones que deben quedar retenidas al final de una hoja terminal." },
@@ -425,7 +496,7 @@
                         link_doc: "https://xgboost.readthedocs.io/en/stable/python/python_api.html#xgboost.XGBClassifier",
                         link_paper: "https://arxiv.org/abs/1603.02754",
                         hps: [
-                            { param: "n_estimators", rango: "Rango sugerido: 50 a 400 [Entero]", def: "Cantidad total de etapas secuenciales de boosting o árboles correctores a ajustar." },
+                            { param: "n_estimators", rango: "Rango sugerido: 50 a 300 [Entero]", def: "Cantidad total de etapas secuenciales de boosting o árboles correctores a ajustar." },
                             { param: "learning_rate", rango: "Rango: 0.01 a 0.3 (eta) [Flotante]", def: "Paso de aprendizaje que reduce la magnitud de la corrección de cada árbol." },
                             { param: "max_depth", rango: "Rango: 2 a 10 [Entero]", def: "Profundidad máxima permitida por árbol corrector para prevenir sobreajuste estructural." },
                             { param: "subsample", rango: "Rango: 0.5 a 1.0 [Flotante]", def: "Porcentaje de instancias a muestrear aleatoriamente antes de construir una nueva etapa." },
@@ -439,7 +510,7 @@
                     "Softmax Regression": {
                         paper_autor: "David Cox (1958) - Journal of the Royal Statistical Society",
                         descripcion: "Generalización multinomial de la regresión logística para problemas de clasificación multiclase. Utiliza una normalización exponencial (Softmax) para mapear combinaciones lineales a probabilidades.",
-                        fortalezas: "Cómputo instantáneo, coeficientes altamente interpretables y excelente como baseline de referencia.",
+                        fortalezas: "Máxima velocidad de convergencia, alta estabilidad matemática e interpretación directa de pesos.",
                         link_doc: "https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html",
                         link_paper: "https://www.jstor.org/stable/2983890",
                         hps: [
@@ -472,6 +543,23 @@
                     dialogoHps.value = true;
                 };
 
+                const refrescarClustersDinamicamente = async () => {
+                    try {
+                        const res = await fetch('/api/xai/projections-dynamic', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(hpsProyecciones.value)
+                        });
+                        const data = await res.json();
+                        if (data.status === 'ok') {
+                            cachePuntosProyecciones.value = data.puntos;
+                            if (document.getElementById('plotly-chart-area')) {
+                                dibujarGrafico();
+                            }
+                        }
+                    } catch (e) { console.error(e); }
+                };
+
                 const calcularPipelineCompletoXAI = async () => {
                     await calcularPermutationImportanceXAI();
                     await calcularParcialDependenceXAI();
@@ -491,13 +579,8 @@
                             const trace = {
                                 x: p.map(x => x.importance_mean).reverse(),
                                 y: p.map(x => x.feature).reverse(),
-                                type: 'bar', orientation: 'h',
-                                marker: { color: '#132B4F' },
-                                error_x: {
-                                    type: 'data',
-                                    array: p.map(x => x.importance_std).reverse(),
-                                    visible: true, color: '#8B1D2F'
-                                }
+                                type: 'bar', orientation: 'h', marker: { color: '#132B4F' },
+                                error_x: { type: 'data', array: p.map(x => x.importance_std).reverse(), visible: true, color: '#8B1D2F' }
                             };
                             Plotly.newPlot('chart-permutation-importance', [trace], {
                                 paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
@@ -519,16 +602,9 @@
                         if (data.status === 'ok') {
                             const traces = [];
                             data.ice.forEach(line => {
-                                traces.push({
-                                    x: data.grid, y: line, mode: 'lines',
-                                    line: { color: 'rgba(150,150,150,0.18)', width: 1.2 },
-                                    hoverinfo: 'skip', showlegend: false
-                                });
+                                traces.push({ x: data.grid, y: line, mode: 'lines', line: { color: 'rgba(150,150,150,0.18)', width: 1.2 }, hoverinfo: 'skip', showlegend: false });
                             });
-                            traces.push({
-                                x: data.grid, y: data.pdp, mode: 'lines',
-                                name: 'PDP Promedio', line: { color: '#132B4F', width: 4.5 }
-                            });
+                            traces.push({ x: data.grid, y: data.pdp, mode: 'lines', name: 'PDP Promedio', line: { color: '#132B4F', width: 4.5 } });
                             Plotly.newPlot('chart-pdp-ice', traces, {
                                 paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
                                 margin: { l: 40, r: 10, b: 35, t: 10 },
@@ -546,10 +622,7 @@
                             body: JSON.stringify({ model: modeloSeleccionadoXAI.value })
                         });
                         const data = await res.json();
-                        if (data.status === 'ok') {
-                            cacheDatosSHAP.value = data;
-                            renderizarGraficosSHAP();
-                        }
+                        if (data.status === 'ok') { cacheDatosSHAP.value = data; renderizarGraficosSHAP(); }
                     } catch (e) { console.error(e); }
                 };
 
@@ -557,73 +630,38 @@
                     if (!cacheDatosSHAP.value) return;
                     const data = cacheDatosSHAP.value;
                     const divId = 'chart-shap-workspace';
-                    
                     if (tipoVisualizacionSHAP.value === 'barras') {
                         const medias = data.features.map((feat, idx) => {
                             const absSuma = data.shap_values.reduce((acc, row) => acc + Math.abs(row[idx]), 0);
                             return { feature: feat, val: absSuma / data.shap_values.length };
                         });
                         const ordenado = medias.sort((a, b) => a.val - b.val).slice(-8);
-                        const trace = {
-                            x: ordenado.map(x => x.val), y: ordenado.map(x => x.feature),
-                            type: 'bar', orientation: 'h', marker: { color: '#2E7D32' }
-                        };
-                        Plotly.newPlot(divId, [trace], {
-                            paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-                            margin: { l: 110, r: 10, b: 35, t: 10 },
-                            xaxis: { gridcolor: '#F0F0F0', title: 'Impacto Medio |SHAP Value|' }
-                        }, { responsive: true, displayModeBar: false });
-                    }
-                    else if (tipoVisualizacionSHAP.value === 'beeswarm') {
+                        const trace = { x: ordenado.map(x => x.val), y: ordenado.map(x => x.feature), type: 'bar', orientation: 'h', marker: { color: '#2E7D32' } };
+                        Plotly.newPlot(divId, [trace], { paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', margin: { l: 110, r: 10, b: 35, t: 10 }, xaxis: { gridcolor: '#F0F0F0', title: 'Impacto Medio |SHAP Value|' } }, { responsive: true, displayModeBar: false });
+                    } else if (tipoVisualizacionSHAP.value === 'beeswarm') {
                         const xCoords = []; const yCoords = []; const colores = [];
                         data.features.forEach((feat, fIdx) => {
                             data.shap_values.forEach((row, rIdx) => {
-                                xCoords.push(row[fIdx]);
-                                yCoords.push(fIdx + (Math.random() * 0.3 - 0.15));
-                                colores.push(data.real_values[rIdx][fIdx]);
+                                xCoords.push(row[fIdx]); yCoords.push(fIdx + (Math.random() * 0.3 - 0.15)); colores.push(data.real_values[rIdx][fIdx]);
                             });
                         });
-                        const trace = {
-                            x: xCoords, y: yCoords, mode: 'markers',
-                            marker: {
-                                size: 6, opacity: 0.75, color: colores,
-                                colorscale: [[0, '#1E88E5'], [0.5, '#E0E0E0'], [1, '#FF0052']],
-                                showscale: true, colorbar: { title: 'Valor Real', thickness: 10, len: 0.9 }
-                            }
-                        };
-                        Plotly.newPlot(divId, [trace], {
-                            paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-                            margin: { l: 110, r: 10, b: 35, t: 10 },
-                            yaxis: { tickmode: 'array', tickvals: data.features.map((_, i) => i), ticktext: data.features, gridcolor: '#F5F5F5' },
-                            xaxis: { gridcolor: '#F0F0F0', title: 'SHAP Value (Impacto Predictivo)' }
-                        }, { responsive: true, displayModeBar: false });
-                    }
-                    else if (tipoVisualizacionSHAP.value === 'dependencia') {
+                        const trace = { x: xCoords, y: yCoords, mode: 'markers', marker: { size: 6, opacity: 0.75, color: colores, colorscale: [[0, '#1E88E5'], [0.5, '#E0E0E0'], [1, '#FF0052']], showscale: true, colorbar: { title: 'Valor Real', thickness: 10, len: 0.9 } } };
+                        Plotly.newPlot(divId, [trace], { paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', margin: { l: 110, r: 10, b: 35, t: 10 }, yaxis: { tickmode: 'array', tickvals: data.features.map((_, i) => i), ticktext: data.features, gridcolor: '#F5F5F5' }, xaxis: { gridcolor: '#F0F0F0', title: 'SHAP Value' } }, { responsive: true, displayModeBar: false });
+                    } else if (tipoVisualizacionSHAP.value === 'dependencia') {
                         const fIdx = data.features.indexOf(featureSeleccionadaXAI.value);
-                        const trace = {
-                            x: data.real_values.map(row => row[fIdx]),
-                            y: data.shap_values.map(row => row[fIdx]),
-                            mode: 'markers', marker: { size: 9, color: '#132B4F', opacity: 0.85 }
-                        };
-                        Plotly.newPlot(divId, [trace], {
-                            paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-                            margin: { l: 50, r: 10, b: 45, t: 10 },
-                            xaxis: { gridcolor: '#F0F0F0', title: `Valor Estandarizado de ${featureSeleccionadaXAI.value}` },
-                            yaxis: { gridcolor: '#F0F0F0', title: 'SHAP Value (Impacto)' }
-                        }, { responsive: true, displayModeBar: false });
+                        const trace = { x: data.real_values.map(row => row[fIdx]), y: data.shap_values.map(row => row[fIdx]), mode: 'markers', marker: { size: 9, color: '#132B4F', opacity: 0.85 } };
+                        Plotly.newPlot(divId, [trace], { paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', margin: { l: 50, r: 10, b: 45, t: 10 }, xaxis: { gridcolor: '#F0F0F0', title: 'Valor real' }, yaxis: { gridcolor: '#F0F0F0', title: 'SHAP Value' } }, { responsive: true, displayModeBar: false });
                     }
                 };
 
-                const headersFeatures = [
-                    'alcohol', 'malic_acid', 'ash', 'alcalinity_of_ash', 'magnesium', 
-                    'total_phenols', 'flavanoids', 'nonflavanoid_phenols', 'proanthocyanidins', 
-                    'color_intensity', 'hue', 'od280_od315_of_diluted_wines', 'proline'
-                ];
+                const cambiarHiperparametrosPorDefecto = (m) => { grillaTextoUsuario.value = grillasSugeridasPorModelo[m]; };
 
-                const headersPredictions = ref([
-                    'PRED_RANDOM_FOREST', 'PRED_XGBOOST', 'PRED_NAIVE_BAYES', 'PRED_SOFTMAX_REGRESSION'
-                ]);
-                
+                const cargarArchivoCSVEspecifico = (event) => {
+                    const files = event.target.files;
+                    if (!files || files.length === 0) return;
+                    enviarCSVAlServidor(files[0]);
+                };
+
                 const rows = ref([
                     {
                         'alcohol': '13.00', 'malic_acid': '2.34', 'ash': '2.36', 'alcalinity_of_ash': '19.5', 'magnesium': '99.7',
@@ -633,101 +671,55 @@
                     }
                 ]);
 
-                const integrantes = [
-                    { nombre: 'Jhosse Paul Márquez Ruiz', email: '0287289@up.edu.mx' },
-                    { nombre: 'César Augusto Pérez Rosas', email: '0287285@up.edu.mx' },
-                    { nombre: 'Gerardo David Rivero Rique', email: '0287274@up.edu.mx' },
-                    { nombre: 'Luis Antonio Mani Yáñez', email: '0287239@up.edu.mx' },
-                    { nombre: 'Oscar Barranco Velázquez', email: '0287244@up.edu.mx' }
-                ];
-
-                const cambiarHiperparametrosPorDefecto = (nuevoModelo) => {
-                    grillaTextoUsuario.value = grillasSugeridasPorModelo[nuevoModelo];
-                };
-
                 const cargarPipelineML = async () => {
                     try {
                         const res = await fetch('/api/ml-results');
                         mlData.value = await res.json();
-                        
                         listaPoolDinamica.value = Object.keys(mlData.value.modelos).map(name => ({
-                            arquitectura: name,
-                            train_acc: mlData.value.modelos[name].train_acc,
-                            test_acc: mlData.value.modelos[name].test_acc,
-                            precision: mlData.value.modelos[name].precision,
-                            es_optimizado: mlData.value.modelos[name].es_optimizado || false
+                            arquitectura: name, train_acc: mlData.value.modelos[name].train_acc, test_acc: mlData.value.modelos[name].test_acc, precision: mlData.value.modelos[name].precision, es_optimizado: mlData.value.modelos[name].es_optimizado || false
                         }));
-
-                        if (activeTab.value === 'proyecciones') {
-                            dibujarGrafico();
-                        } else if (activeTab.value === 'xai') {
-                            await nextTick();
-                            await calcularPipelineCompletoXAI();
-                        }
-                    } catch (err) {
-                        console.error("Fallo al conectar pipeline ML:", err);
-                    }
+                        
+                        const resProj = await fetch('/api/xai/projections-dynamic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(hpsProyecciones.value) });
+                        const dataProj = await resProj.json();
+                        if (dataProj.status === 'ok') { cachePuntosProyecciones.value = dataProj.puntos; }
+                    } catch (err) { console.error(err); }
                 };
 
                 const ejecutarBenchmarkMallas = async () => {
                     ejecutandoGridSearch.value = true;
                     dataBenchmarkResp.value = null;
                     try {
-                        const res = await fetch('/api/retrain', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                model: modeloReentrenar.value,
-                                grid_text: grillaTextoUsuario.value
-                            })
-                        });
+                        const res = await fetch('/api/retrain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: modeloReentrenar.value, grid_text: grillaTextoUsuario.value }) });
                         const data = await res.json();
-                        if (data.status === 'ok') {
-                            dataBenchmarkResp.value = data.benchmark_lista;
-                            listaPoolDinamica.value = data.pool_lista;
-                        }
-                    } catch (e) {
-                        console.error("Error en mallas:", e);
-                    } finally {
-                        ejecutandoGridSearch.value = false;
-                    }
+                        if (data.status === 'ok') { dataBenchmarkResp.value = data.benchmark_lista; listaPoolDinamica.value = data.pool_lista; }
+                    } catch (e) { console.error(e); } finally { ejecutandoGridSearch.value = false; }
                 };
 
                 const agregarFilaVacia = () => {
                     const nuevaFila = {};
                     headersFeatures.forEach(h => nuevaFila[h] = '0.0');
-                    headersPredictions.value.forEach(p => nuevaFila[p] = '');
+                    headersPredictions.forEach(p => nuevaFila[p] = '');
                     rows.value.push(nuevaFila);
                 };
 
-                const removerFilaEspecifica = (idx) => {
-                    if (rows.value.length > 1) { rows.value.splice(idx, 1); }
-                };
+                const removerFilaEspecifica = (idx) => { if (rows.value.length > 1) { rows.value.splice(idx, 1); } };
 
                 const procesarInferenciaManual = async () => {
                     cargandoInferencia.value = true;
                     try {
-                        const res = await fetch('/api/predict-table', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ rows: rows.value })
-                        });
-                        const resultado = await res.json();
-                        if (resultado.status === 'ok') {
-                            rows.value = resultado.rows;
-                        }
+                        const res = await fetch('/api/predict-table', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows: rows.value }) });
+                        const r = await res.json();
+                        if (r.status === 'ok') { rows.value = r.rows; }
                     } catch (e) { console.error(e); } finally { cargandoInferencia.value = false; }
                 };
 
-                const enviarCSVAlServidor = async (fileObj) => {
-                    if (!fileObj) return;
-                    const archivo = Array.isArray(fileObj) ? fileObj[0] : fileObj;
+                const enviarCSVAlServidor = async (fileBlob) => {
                     const dataForm = new FormData();
-                    dataForm.append('file', archivo);
+                    dataForm.append('file', fileBlob);
                     try {
                         const res = await fetch('/api/upload-csv', { method: 'POST', body: dataForm });
-                        const resultado = await res.json();
-                        if (resultado.status === 'ok') { rows.value = resultado.rows; }
+                        const r = await res.json();
+                        if (r.status === 'ok') { r.rows.length ? rows.value = r.rows : null; }
                     } catch (e) { console.error(e); }
                 };
 
@@ -742,19 +734,19 @@
                 };
 
                 const descargarPrediccionesCompletas = () => {
-                    const todasLasCabeceras = [...headersFeatures, ...headersPredictions.value];
+                    const todasLasCabeceras = [...headersFeatures, ...headersPredictions];
                     const txtHead = todasLasCabeceras.join(',');
                     const txtRows = rows.value.map(r => todasLasCabeceras.map(h => r[h] || '').join(',')).join('\n');
                     const blob = new Blob([txtHead + '\n' + txtRows], { type: 'text/csv;charset=utf-8;' });
                     const link = document.createElement("a");
                     link.href = URL.createObjectURL(blob);
-                    link.setAttribute("download", "reporte_consolidado.csv");
+                    link.setAttribute("download", "reporte_predicciones.csv");
                     link.click();
                 };
 
                 const dibujarGrafico = () => {
-                    if (!mlData.value.puntos || !mlData.value.puntos.length) return;
-                    const pts = mlData.value.puntos;
+                    if (!cachePuntosProyecciones.value || !cachePuntosProyecciones.value.length) return;
+                    const pts = cachePuntosProyecciones.value;
                     const key = algoritmoDim.value;
                     const traces = mlData.value.clases.map((c, i) => {
                         const sub = pts.filter(p => p.clase === c);
@@ -774,14 +766,30 @@
 
                 const manejarCambioTab = async (tabValue) => {
                     await nextTick();
-                    if (tabValue === 'proyecciones') { dibujarGrafico(); }
+                    if (tabValue === 'proyecciones') { 
+                        if (!cachePuntosProyecciones.value.length) {
+                            await refrescarClustersDinamicamente();
+                        } else {
+                            dibujarGrafico(); 
+                        }
+                    }
                     else if (tabValue === 'xai') { await calcularPipelineCompletoXAI(); }
                 };
 
                 onMounted(cargarPipelineML);
 
-                // CORRECCIÓN: Se expone explícitamente ejecutarBenchmarkMallas en el retorno del setup para que el DOM lo consuma
-                return { activeTab, algoritmoDim, mlData, integrantes, headersFeatures, headersPredictions, rows, cargandoInferencia, modeloReentrenar, grillaTextoUsuario, ejecutandoGridSearch, dataBenchmarkResp, listaPoolDinamica, cambiarHiperparametrosPorDefecto, ejecutarBenchmarkMallas, agregarFilaVacia, removerFilaEspecifica, procesarInferenciaManual, enviarCSVAlServidor, descargarSoloPlantillaFeatures, descargarPrediccionesCompletas, dibujarGrafico, manejarCambioTab, carouselIndex, dialogoHps, modeloSeleccionadoHps, hpDetallesSeleccionados, catalogoModelosExplicativos, auditarHiperparametrosModelo, professorName, linkDocSeleccionado, linkPaperSeleccionado, modeloSeleccionadoXAI, featureSeleccionadaXAI, tipoVisualizacionSHAP, calcularPipelineCompletoXAI, calcularParcialDependenceXAI, renderizarGraficosSHAP };
+                // EXPOSICIÓN TOTAL: Se retornan 'headersFeatures' y 'headersPredictions' síncronamente al Virtual DOM
+                return { 
+                    activeTab, algoritmoDim, mlData, integrantes, headersFeatures, headersPredictions, rows, 
+                    cargandoInferencia, modeloReentrenar, grillaTextoUsuario, ejecutandoGridSearch, dataBenchmarkResp, 
+                    listaPoolDinamica, cambiarHiperparametrosPorDefecto, ejecutarBenchmarkMallas, agregarFilaVacia, 
+                    removerFilaEspecifica, procesarInferenciaManual, enviarCSVAlServidor, descargarSoloPlantillaFeatures, 
+                    descargarPrediccionesCompletas, dibujarGrafico, manejarCambioTab, carouselIndex, dialogoHps, 
+                    modeloSeleccionadoHps, hpDetallesSeleccionados, catalogoModelosExplicativos, auditarHiperparametrosModelo, 
+                    professorName, linkDocSeleccionado, linkPaperSeleccionado, modeloSeleccionadoXAI, featureSeleccionadaXAI, 
+                    tipoVisualizacionSHAP, calcularPipelineCompletoXAI, calcularParcialDependenceXAI, renderizarGraficosSHAP, 
+                    hpsProyecciones, refrescarClustersDinamicamente, cachePuntosProyecciones, itemsMenuMovi, cargarArchivoCSVEspecifico
+                };
             }
         }).use(cuetifyInstance).mount('#app');
     </script>
