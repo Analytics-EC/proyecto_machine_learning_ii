@@ -29,6 +29,18 @@
 </head>
 <body>
     <div id="app">
+        <v-overlay :model-value="cargandoProcesoGlobal" class="align-center justify-center" persistent scrim="#132B4F">
+            <v-card class="text-center pa-6 rounded-xl" max-width="340" color="white" elevation="16">
+                <div class="d-flex justify-center mb-4">
+                    <v-progress-circular :size="75" :width="7" color="#8B1D2F" indeterminate>
+                        <v-icon :icon="iconoCargaDinamico" size="32" class="mdi-spin text-navy"></v-icon>
+                    </v-progress-circular>
+                </div>
+                <div class="text-subtitle-1 font-weight-bold text-navy" v-text="mensajeCargaGlobal"></div>
+                <div class="text-caption text-grey-darken-1 mt-1">Computando pipelines en el servidor...</div>
+            </v-card>
+        </v-overlay>
+
         <v-app style="background: transparent;">
             
             <v-app-bar class="up-navbar px-4" height="125" fixed flat>
@@ -165,9 +177,9 @@
                                 <v-col cols="12" md="4">
                                     <v-card class="up-card-premium pa-6" elevation="0">
                                         <div class="text-h6 font-weight-bold text-navy mb-1">Centro de Explicabilidad</div>
-                                        <p class="text-caption text-grey mb-6">Selecciona el estimador y la variable para auditar el comportamiento global.</p>
+                                        <p class="text-caption text-grey mb-6">Selecciona el modelo  y la variable para calcular su importancia global.</p>
                                         <v-select v-model="modeloSeleccionadoXAI" :items="['Random Forest', 'XGBoost', 'Naive Bayes', 'Softmax Regression']" label="Arquitectura de Análisis" variant="outlined" color="#132B4F" density="comfortable" class="mb-4" @update:model-value="calcularPipelineCompletoXAI"></v-select>
-                                        <v-select v-model="featureSeleccionadaXAI" :items="headersFeatures" label="Variable Química (PDP / ICE)" variant="outlined" color="#8B1D2F" density="comfortable" class="mb-4" @update:model-value="calcularParcialDependenceXAI"></v-select>
+                                        <v-select v-model="featureSeleccionadaXAI" :items="headersFeatures" label="Variable Química (PDP / ICE)" variant="outlined" color="#8B1D2F" density="comfortable" class="mb-4" @update:model-value="calcularPipelineCompletoXAI"></v-select>
                                     </v-card>
                                 </v-col>
                                 <v-col cols="12" md="8">
@@ -420,6 +432,11 @@
                 const mlData = ref({ modelos: {}, clases: [], puntos: [] });
                 const cargandoInferencia = ref(false);
 
+                // CONTROLADORES DE CARGA PREMIUM
+                const cargandoProcesoGlobal = ref(false);
+                const mensajeCargaGlobal = ref('Procesando datos...');
+                const iconoCargaDinamico = ref('mdi-brain');
+
                 const modeloReentrenar = ref('Random Forest');
                 const grillaTextoUsuario = ref("n_estimators: 10, 50\nmax_depth: 3, 5\ncriterion: gini, entropy");
                 const ejecutandoGridSearch = ref(false);
@@ -452,7 +469,6 @@
                     'color_intensity', 'hue', 'od280_od315_of_diluted_wines', 'proline'
                 ];
 
-                // REPARACIÓN COMPLETA: Declaradas y expuestas de manera explícita ambas cabeceras predictivas requeridas por el DOM
                 const headersPredictions = [
                     'PRED_RANDOM_FOREST', 'PRED_XGBOOST', 'PRED_NAIVE_BAYES', 'PRED_SOFTMAX_REGRESSION'
                 ];
@@ -464,10 +480,7 @@
 
                 const integrantes = [
                     { nombre: 'Jhosse Paul Márquez Ruiz', email: '0287289@up.edu.mx' },
-                    { nombre: 'César Augusto Pérez Rosas', email: '0287285@up.edu.mx' },
-                    { nombre: 'Gerardo David Rivero Rique', email: '0287274@up.edu.mx' },
-                    { nombre: 'Luis Antonio Mani Yáñez', email: '0287239@up.edu.mx' },
-                    { nombre: 'Oscar Barranco Velázquez', email: '0287244@up.edu.mx' }
+                    { nombre: 'Gerardo David Rivero Rique', email: '0287274@up.edu.mx' }
                 ];
 
                 const catalogoModelosExplicativos = {
@@ -561,9 +574,18 @@
                 };
 
                 const calcularPipelineCompletoXAI = async () => {
-                    await calcularPermutationImportanceXAI();
-                    await calcularParcialDependenceXAI();
-                    await extraerMatricesSHAPValues();
+                    iconoCargaDinamico.value = 'mdi-chart-scatter-plot';
+                    mensajeCargaGlobal.value = `Calculando importancia de la variable ${featureSeleccionadaXAI.value.toUpperCase()}`;
+                    cargandoProcesoGlobal.value = true;
+                    try {
+                        await calcularPermutationImportanceXAI();
+                        await calcularParcialDependenceXAI();
+                        await extraerMatricesSHAPValues();
+                    } catch (e) { 
+                        console.error(e); 
+                    } finally {
+                        setTimeout(() => { cargandoProcesoGlobal.value = false; }, 400);
+                    }
                 };
 
                 const calcularPermutationImportanceXAI = async () => {
@@ -688,11 +710,19 @@
                 const ejecutarBenchmarkMallas = async () => {
                     ejecutandoGridSearch.value = true;
                     dataBenchmarkResp.value = null;
+                    iconoCargaDinamico.value = 'mdi-timer-sand';
+                    mensajeCargaGlobal.value = `Ejecutando Grid, Random y Optuna Bayesiano para ${modeloReentrenar.value}...`;
+                    cargandoProcesoGlobal.value = true;
                     try {
                         const res = await fetch('/api/retrain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: modeloReentrenar.value, grid_text: grillaTextoUsuario.value }) });
                         const data = await res.json();
                         if (data.status === 'ok') { dataBenchmarkResp.value = data.benchmark_lista; listaPoolDinamica.value = data.pool_lista; }
-                    } catch (e) { console.error(e); } finally { ejecutandoGridSearch.value = false; }
+                    } catch (e) { 
+                        console.error(e); 
+                    } finally { 
+                        ejecutandoGridSearch.value = false; 
+                        setTimeout(() => { cargandoProcesoGlobal.value = false; }, 300);
+                    }
                 };
 
                 const agregarFilaVacia = () => {
@@ -778,10 +808,10 @@
 
                 onMounted(cargarPipelineML);
 
-                // EXPOSICIÓN TOTAL: Se retornan 'headersFeatures' y 'headersPredictions' síncronamente al Virtual DOM
                 return { 
                     activeTab, algoritmoDim, mlData, integrantes, headersFeatures, headersPredictions, rows, 
                     cargandoInferencia, modeloReentrenar, grillaTextoUsuario, ejecutandoGridSearch, dataBenchmarkResp, 
+                    cargandoProcesoGlobal, mensajeCargaGlobal, iconoCargaDinamico,
                     listaPoolDinamica, cambiarHiperparametrosPorDefecto, ejecutarBenchmarkMallas, agregarFilaVacia, 
                     removerFilaEspecifica, procesarInferenciaManual, enviarCSVAlServidor, descargarSoloPlantillaFeatures, 
                     descargarPrediccionesCompletas, dibujarGrafico, manejarCambioTab, carouselIndex, dialogoHps, 
