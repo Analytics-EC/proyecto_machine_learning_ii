@@ -290,8 +290,11 @@ def retrain_and_benchmark():
         elif modelo_seleccionado == "XGBoost":
             estimator = XGBClassifier(objective='multi:softprob', random_state=42)
         elif modelo_seleccionado == "Softmax Regression":
-            # 2. CORRECCIÓN MULTICLASE: Removido el parámetro obsoleto en el reentrenamiento de malla fija
-            estimator = LogisticRegression(solver='lbfgs', max_iter=500, random_state=42)
+            # Si max_iter no viene en el texto de la grilla, le metemos 500 por defecto de forma segura
+            if "max_iter" not in param_grid:
+                estimator = LogisticRegression(solver='lbfgs', max_iter=500, random_state=42)
+            else:
+                estimator = LogisticRegression(solver='lbfgs', random_state=42)
         else:
             estimator = GaussianNB()
             
@@ -343,7 +346,9 @@ def retrain_and_benchmark():
                 clf = XGBClassifier(**params, objective='multi:softprob', random_state=42)
             elif modelo_seleccionado == "Softmax Regression":
                 # 3. CORRECCIÓN MULTICLASE: Removido en el estimador dinámico del bucle interno de Optuna
-                clf = LogisticRegression(**params, solver='lbfgs', max_iter=500, random_state=42)
+                if "max_iter" not in params:
+                    params["max_iter"] = 500
+                clf = LogisticRegression(**params, solver='lbfgs', random_state=42)
             else:
                 clf = GaussianNB(**params)
             return cross_val_score(clf, X_TRAIN_SCALED, Y_TRAIN, cv=3, scoring='accuracy').mean()
@@ -357,8 +362,10 @@ def retrain_and_benchmark():
         elif modelo_seleccionado == "XGBoost":
             opt_clf = XGBClassifier(**study.best_params, objective='multi:softprob', random_state=42).fit(X_TRAIN_SCALED, Y_TRAIN)
         elif modelo_seleccionado == "Softmax Regression":
-            # 4. CORRECCIÓN MULTICLASE: Removido en el ajuste del estimador final optimizado por Bayes
-            opt_clf = LogisticRegression(**study.best_params, solver='lbfgs', max_iter=500, random_state=42).fit(X_TRAIN_SCALED, Y_TRAIN)
+            # Si Optuna ya optimizó max_iter, dejamos que use ese. Si no, le metemos 500.
+            if "max_iter" not in study.best_params:
+                study.best_params["max_iter"] = 500
+            opt_clf = LogisticRegression(**study.best_params, solver='lbfgs', random_state=42).fit(X_TRAIN_SCALED, Y_TRAIN)
         else:
             opt_clf = GaussianNB(**study.best_params).fit(X_TRAIN_SCALED, Y_TRAIN)
             

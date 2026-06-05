@@ -37,7 +37,7 @@
                     </v-progress-circular>
                 </div>
                 <div class="text-subtitle-1 font-weight-bold text-navy" v-text="mensajeCargaGlobal"></div>
-                <div class="text-caption text-grey-darken-1 mt-1">Computando pipelines en el servidor...</div>
+                <div class="text-caption text-grey-darken-1 mt-1">Calculando importancia en el servidor...</div>
             </v-card>
         </v-overlay>
 
@@ -47,7 +47,7 @@
                 <div class="d-flex align-center">
                     <v-img src="{{ url_for('static', filename='logo_up.png') }}" max-height="175" style="width: 200px; min-width: 200px;" class="mr-4"></v-img>
                     <div class="hidden-sm-and-down">
-                        <h1 class="text-h5 font-weight-bold text-navy" style="font-family: 'Montserrat', sans-serif;">Laboratorio de Machine Learning 2</h1>
+                        <h1 class="text-h5 font-weight-bold text-navy" style="font-family: 'Montserrat', sans-serif;">Proyecto final de Machine Learning 2</h1>
                         <p class="text-caption text-grey-darken-2 mb-0">Profesor: <strong class="text-guinda" v-text="professorName"></strong></p>
                     </div>
                 </div>
@@ -84,12 +84,14 @@
                             <v-row>
                                 <v-col cols="12" md="7">
                                     <v-card class="up-card-premium pa-6 mb-4" elevation="0">
-                                        <div class="text-h5 font-weight-bold text-navy mb-2">Objetivo del Laboratorio</div>
-                                        <p class="text-body-1 text-grey-darken-3 mb-6">Evaluar, optimizar mediante algoritmos bayesianos y auditar bajo técnicas de explicabilidad (XAI) un pool multiparámetrico de clasificadores supervisados entrenados con el dataset físico-químico Wine, contrastando la consistencia de sus fronteras mediante reducción de dimensionalidad espacial.</p>
-                                        <div class="text-subtitle-1 font-weight-bold text-navy mb-2">Mapa de Operación de la Suite</div>
-                                        <div class="text-body-2 mb-2"><strong>1. Catálogo Académico:</strong> Análisis teórico profundo de hiperparámetros junto a accesos directos a papers indexados.</div>
-                                        <div class="text-body-2 mb-2"><strong>2. Explicabilidad (XAI):</strong> Auditoría global mediante Permutation Importance y análisis local detallado con PDP, ICE y SHAP Values.</div>
-                                        <div class="text-body-2 mb-2"><strong>3. Inferencia de Matrices:</strong> Workspace dinámico para evaluar lotes químicos mediante archivos .csv planos.</div>
+                                        <div class="text-h5 font-weight-bold text-navy mb-2">Objetivo del Proyecto</div>
+                                        <p class="text-body-1 text-grey-darken-3 mb-6">Evaluar y comparar diferentes modelos de Machine Learning entrenados con el dataset físico-químico Wine. La aplicación permite reentrenar y optimizar hiperparámetros en tiempo real usando algoritmos bayesianos, realizar un análisis detallado de explicabilidad (XAI) para entender el comportamiento de los modelos, y validar visualmente sus fronteras de decisión. Adicionalmente, incluye un espacio de inferencia interactivo para generar predicciones al instante, ya sea manipulando los valores de las variables directamente desde el frontend o subiendo archivos masivos en formato .csv.</p>
+                                        
+                                        <div class="text-subtitle-1 font-weight-bold text-navy mb-2">Flujo de Operación de la Aplicación</div>
+                                        <div class="text-body-2 mb-2"><strong>1. Catálogo de Hiperparámetros:</strong> Análisis teórico profundo de hiperparámetros junto a accesos directos a papers indexados.</div>
+                                        <div class="text-body-2 mb-2"><strong>2. Explicabilidad (XAI):</strong> Análisis global mediante Permutation Importance y estudio local detallado con PDP, ICE y SHAP Values.</div>
+                                        <div class="text-body-2 mb-2"><strong>3. Optimización y Reentrenamiento:</strong> Ajuste dinámico de mallas numéricas y ejecución de muestreo bayesiano con Optuna para comparar la eficiencia en tiempo de cómputo.</div>
+                                        <div class="text-body-2 mb-2"><strong>4. Inferencia Dinámica:</strong> Espacio interactivo para evaluar muestras al instante modificando los valores en la tabla o subiendo archivos .csv.</div>
                                     </v-card>
                                 </v-col>
                                 <v-col cols="12" md="5">
@@ -176,7 +178,7 @@
                             <v-row>
                                 <v-col cols="12" md="4">
                                     <v-card class="up-card-premium pa-6" elevation="0">
-                                        <div class="text-h6 font-weight-bold text-navy mb-1">Centro de Explicabilidad</div>
+                                        <div class="text-h6 font-weight-bold text-navy mb-1">Explicabilidad</div>
                                         <p class="text-caption text-grey mb-6">Selecciona el modelo  y la variable para calcular su importancia global.</p>
                                         <v-select v-model="modeloSeleccionadoXAI" :items="['Random Forest', 'XGBoost', 'Naive Bayes', 'Softmax Regression']" label="Arquitectura de Análisis" variant="outlined" color="#132B4F" density="comfortable" class="mb-4" @update:model-value="calcularPipelineCompletoXAI"></v-select>
                                         <v-select v-model="featureSeleccionadaXAI" :items="headersFeatures" label="Variable Química (PDP / ICE)" variant="outlined" color="#8B1D2F" density="comfortable" class="mb-4" @update:model-value="calcularPipelineCompletoXAI"></v-select>
@@ -674,6 +676,12 @@
                         const trace = { x: data.real_values.map(row => row[fIdx]), y: data.shap_values.map(row => row[fIdx]), mode: 'markers', marker: { size: 9, color: '#132B4F', opacity: 0.85 } };
                         Plotly.newPlot(divId, [trace], { paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', margin: { l: 50, r: 10, b: 45, t: 10 }, xaxis: { gridcolor: '#F0F0F0', title: 'Valor real' }, yaxis: { gridcolor: '#F0F0F0', title: 'SHAP Value' } }, { responsive: true, displayModeBar: false });
                     }
+                };
+                const grillasSugeridasPorModelo = {
+                    "Random Forest": "n_estimators: 10, 50\nmax_depth: 3, 5\ncriterion: gini, entropy",
+                    "XGBoost": "n_estimators: 10, 50\nmax_depth: 3, 5\nlearning_rate: 0.01, 0.1",
+                    "Softmax Regression": "C: 0.1, 1.0, 10.0\nmax_iter: 100, 200",
+                    "Naive Bayes": "var_smoothing: 1e-9, 1e-8"
                 };
 
                 const cambiarHiperparametrosPorDefecto = (m) => { grillaTextoUsuario.value = grillasSugeridasPorModelo[m]; };
