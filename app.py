@@ -1,408 +1,340 @@
-from flask import Flask, jsonify, request, render_template
+import uvicorn
+import logging
+from typing import Any
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+import joblib
+import xgboost as xgb
 import pandas as pd
 import numpy as np
-import os
-import io
-import sys
-import time
-import optuna
-from sklearn.datasets import load_wine
-from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV, cross_val_score
-from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.linear_model import LogisticRegression
-from xgboost import XGBClassifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
+import shap
+
+from sklearn.model_selection import train_test_split
 from sklearn.inspection import permutation_importance, partial_dependence
+from sklearn.metrics import accuracy_score, precision_score, recall_score
 
-try:
-    import shap
-except ImportError:
-    shap = None
+from enum import Enum
+from pydantic import BaseModel, Field
 
-import umap
 
-optuna.logging.set_verbosity(optuna.logging.WARNING)
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+# ==========================================
+# CONFIGURACIÓN DE RUTAS ABSOLUTAS (BLINDADO)
+# ==========================================
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+TEMPLATES_DIR = BASE_DIR / "templates"
+CATEGORIAS_ORDENADAS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+TIPO_ORDINAL_XGB = pd.api.types.CategoricalDtype(categories=CATEGORIAS_ORDENADAS, ordered=True)
 
+app = FastAPI(
+    title='NASA Asteroids Machine Learning & XAI API',
+    description='Backend refactored to FastAPI without scaling, matching original notebook conditions.',
+    version='2.1.0'
+)
+
+# Validar físicamente la existencia antes de montar
+if not STATIC_DIR.exists():
+    raise RuntimeError(f"❌ ERROR CRÍTICO: La carpeta física 'static' NO EXISTE en: {STATIC_DIR}")
+if not TEMPLATES_DIR.exists():
+    raise RuntimeError(f"❌ ERROR CRÍTICO: La carpeta física 'templates' NO EXISTE en: {TEMPLATES_DIR}")
+
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+
+class ModelNameEnum(str, Enum):
+    RANDOM_FOREST = "Random Forest"
+    XGBOOST = "XGBoost"
+
+class AsteroidPredictRequest(BaseModel):
+    model_name: ModelNameEnum = Field(..., description="Nombre del modelo de ML a ejecutar.")
+    absolute_magnitude: float = Field(..., description="Magnitud absoluta H del objeto.")
+    relative_velocity_km_per_hr: float = Field(..., description="Velocidad relativa en km/h.")
+    miss_dist_kilometers: float = Field(..., description="Distancia mínima de aproximación en km.")
+    orbit_uncertainity: int = Field(..., ge=0, le=9, description="Código de incertidumbre de la órbita (0-9).")
+    minimum_orbit_intersection: float = Field(..., description="Distancia mínima de intersección orbital (MOID).")
+    eccentricity: float = Field(..., description="Excentricidad de la órbita.")
+    semi_major_axis: float = Field(..., description="Semieje mayor de la órbita.")
+    inclination: float = Field(..., description="Inclinación orbital en grados.")
+    asc_node_longitude: float = Field(..., description="Longitud del nodo ascendente.")
+    perihelion_distance: float = Field(..., description="Distancia al perihelio.")
+    perihelion_arg: float = Field(..., description="Argumento del perihelio.")
+    mean_anomaly: float = Field(..., description="Anomalía media.")
+    is_coplanar: bool = Field(..., description="Indicador de órbita coplanar.")
+
+
+# ==========================================
+# POOL DE DATOS Y VARIABLES GLOBALES (SIN SCALER)
+# ==========================================
 MODELOS_POOL = {}
-SCALER_GLOBAL = None
+CLASES_TARGET = ["No Peligroso", "Peligroso"]
+X_TRAIN, X_TEST, Y_TRAIN, Y_TEST = None, None, None, None
+CACHED_DATA = {}
 FEATURES_ML = []
-CLASES_TARGET = []
-X_TRAIN_SCALED, X_TEST_SCALED, Y_TRAIN, Y_TEST = None, None, None, None
-X_ALL_SCALED, Y_ALL = None, None
 
 def inicializar_entorno_ia():
-    global MODELOS_POOL, SCALER_GLOBAL, FEATURES_ML, CLASES_TARGET
-    global X_TRAIN_SCALED, X_TEST_SCALED, Y_TRAIN, Y_TEST, X_ALL_SCALED, Y_ALL
+    global MODELOS_POOL, FEATURES_ML, CLASES_TARGET
+    global X_TRAIN, X_TEST, Y_TRAIN, Y_TEST
     
-    wine = load_wine()
-    X, y = wine.data, wine.target
-    FEATURES_ML = list(wine.feature_names)
-    CLASES_TARGET = list(wine.target_names)
-    Y_ALL = y.tolist()
-
+    FEATURES_ML = [
+        'absolute_magnitude', 'relative_velocity_km_per_hr', 'miss_dist_kilometers',
+        'orbit_uncertainity', 'minimum_orbit_intersection', 'eccentricity',
+        'semi_major_axis', 'inclination', 'asc_node_longitude',
+        'perihelion_distance', 'perihelion_arg', 'mean_anomaly', 'is_coplanar'
+    ]
+    path_feather = STATIC_DIR / 'data_feature_engineering.feather'
+    path_rf = STATIC_DIR / 'random_forest.joblib'
+    path_xgb = STATIC_DIR / 'xgboost.json'
+    target_col = "hazardous"
+    
+    # Carga del Dataset
+    df = pd.read_feather(str(path_feather))
+    logger.info(f"df types: {df.dtypes}")
+    if "neo_reference_id" in df.columns:
+        df = df.drop(columns=["neo_reference_id"])
+    if "close_approach_date" in df.columns:
+        df = df.drop(columns=["close_approach_date"])
+        
+    X = df[FEATURES_ML]
+    y = df[target_col]
+    
+    # Partición exacta (Sin transformaciones ni ajustes de escala redundantes)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
-    Y_TRAIN, Y_TEST = y_train, y_test
-
-    SCALER_GLOBAL = StandardScaler()
-    X_train_scaled = SCALER_GLOBAL.fit_transform(X_train)
-    X_test_scaled = SCALER_GLOBAL.transform(X_test)
-    X_ALL_SCALED = SCALER_GLOBAL.transform(X)
     
-    X_TRAIN_SCALED, X_TEST_SCALED = X_train_scaled, X_test_scaled
-
-    rf = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=42).fit(X_train_scaled, y_train)
-    xgb = XGBClassifier(n_estimators=50, max_depth=3, objective='multi:softprob', random_state=42).fit(X_train_scaled, y_train)
-    nb = GaussianNB().fit(X_train_scaled, y_train)
+    X_TRAIN = X_train
+    X_TEST = X_test
+    Y_TRAIN = y_train
+    Y_TEST = y_test
     
-    # 1. CORRECCIÓN MULTICLASE: Removido el parámetro obsoleto en la inicialización base
-    softmax = LogisticRegression(solver='lbfgs', max_iter=200, random_state=42).fit(X_train_scaled, y_train)
-
-    MODELOS_POOL = {"Random Forest": rf, "XGBoost": xgb, "Naive Bayes": nb, "Softmax Regression": softmax}
-
+    # Carga de artefactos binarios originales
+    rf_model = joblib.load(str(path_rf))
+    xgb_model = xgb.XGBClassifier()
+    xgb_model.load_model(str(path_xgb))
+    
+    MODELOS_POOL = {
+        "Random Forest": rf_model,
+        "XGBoost": xgb_model
+    }
+    
     modelos_stats = {}
     for name, model in MODELOS_POOL.items():
-        modelos_stats[name] = {
-            "train_acc": f"{accuracy_score(y_train, model.predict(X_train_scaled))*100:.2f}%",
-            "test_acc": f"{accuracy_score(y_test, model.predict(X_test_scaled))*100:.2f}%",
-            "precision": f"{precision_score(y_test, model.predict(X_test_scaled), average='macro')*100:.2f}%",
-            "recall": f"{recall_score(y_test, model.predict(X_test_scaled), average='macro')*100:.2f}%"
-        }
+        try:
+            preds_train = model.predict(X_TRAIN)
+            preds_test = model.predict(X_TEST)
+            modelos_stats[name] = {
+                'train_acc': f'{accuracy_score(Y_TRAIN, preds_train)*100:.2f}%',
+                'test_acc': f'{accuracy_score(Y_TEST, preds_test)*100:.2f}%',
+                'precision': f'{precision_score(Y_TEST, preds_test, average="macro", zero_division=0)*100:.2f}%',
+                'recall': f'{recall_score(Y_TEST, preds_test, average="macro", zero_division=0)*100:.2f}%'
+            }
+        except Exception as e:
+            modelos_stats[name] = {'error': str(e)}
+            
+    return {'modelos': modelos_stats, 'clases': CLASES_TARGET}
 
-    return {"modelos": modelos_stats, "clases": CLASES_TARGET}
-
+# Ejecutar Setup inicial
 CACHED_DATA = inicializar_entorno_ia()
 
-@app.route("/")
-def index():
-    return render_template("index.html")
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse(request=request, name="index.html")
 
-@app.route("/api/ml-results")
-def get_ml_results():
-    return jsonify(CACHED_DATA)
+@app.get('/api/ml-results')
+async def get_ml_results():
+    return CACHED_DATA
 
-@app.route("/api/xai/projections-dynamic", methods=["GET", "POST"])
-def get_dynamic_projections():
+import pandas.api.types as pjs
+
+@app.get('/api/dataset-stats')
+async def get_dataset_stats():
+    """Analiza las columnas del dataset, detectando tipos continuos, discretos y booleanos"""
     try:
-        perplexity = 15
-        n_neighbors = 15
-        min_dist = 0.1
-        pca_components = 2
-        pca_solver = "auto"
-
-        if request.method == "POST" and request.is_json:
-            req = request.get_json() or {}
-            if req.get("tsne_perplexity") is not None:
-                perplexity = max(5, min(50, int(float(req.get("tsne_perplexity")))))
-            if req.get("umap_neighbors") is not None:
-                n_neighbors = max(2, min(60, int(float(req.get("umap_neighbors")))))
-            if req.get("umap_min_dist") is not None:
-                min_dist = max(0.0, min(0.9, float(req.get("umap_min_dist"))))
-            if req.get("pca_components") is not None:
-                pca_components = max(2, min(5, int(float(req.get("pca_components")))))
-            if req.get("pca_solver") is not None:
-                pca_solver = str(req.get("pca_solver"))
+        path_feather = STATIC_DIR / "data_feature_engineering.feather"
+        df = pd.read_feather(str(path_feather))
+        stats = {}
         
-        pca_coor = PCA(n_components=int(pca_components), svd_solver=pca_solver, random_state=42).fit_transform(X_ALL_SCALED)
-        tsne_coor = TSNE(n_components=2, perplexity=int(perplexity), random_state=42).fit_transform(X_ALL_SCALED)
-        
-        reducer = umap.UMAP(n_neighbors=int(n_neighbors), min_dist=float(min_dist), n_components=2, random_state=42)
-        umap_coor = reducer.fit_transform(X_ALL_SCALED)
-        
-        puntos = []
-        for i in range(len(X_ALL_SCALED)):
-            puntos.append({
-                "clase": CLASES_TARGET[Y_ALL[i]],
-                "pca_x": float(pca_coor[i, 0]), "pca_y": float(pca_coor[i, 1]),
-                "tsne_x": float(tsne_coor[i, 0]), "tsne_y": float(tsne_coor[i, 1]),
-                "umap_x": float(umap_coor[i, 0]), "umap_y": float(umap_coor[i, 1])
-            })
-            
-        return jsonify({"status": "ok", "puntos": puntos})
+        for feat in FEATURES_ML:
+            if feat in df.columns:
+                # 1. Detectar si el campo es de naturaleza booleana / flag lógico
+                is_bool = pjs.is_bool_dtype(df[feat]) or feat in ["is_coplanar"]
+                
+                # 2. Detectar si es un entero o categoría discreta (como orbit_uncertainity)
+                is_discrete = (
+                    df[feat].dtype.name == 'category' or 
+                    pjs.is_integer_dtype(df[feat]) or 
+                    feat == "orbit_uncertainity"
+                )
+                
+                stats[feat] = {
+                    "min": 0 if is_bool else (int(df[feat].min()) if is_discrete else float(df[feat].min())),
+                    "max": 1 if is_bool else (int(df[feat].max()) if is_discrete else float(df[feat].max())),
+                    "default": bool(df[feat].iloc[0]) if is_bool else (int(df[feat].iloc[0]) if is_discrete else float(df[feat].iloc[0])),
+                    "is_bool": is_bool,
+                    "step": 1 if is_discrete else "any"
+                }
+        return {"status": "ok", "features": stats}
     except Exception as e:
-        print(f"❌ CRASH EN PROYECCIONES XAI: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.route("/api/xai/permutation", methods=["POST"])
-def get_permutation_importance():
+@app.get('/api/dataset-table')
+async def get_dataset_table(page: int = 1, per_page: int = 10):
     try:
-        req = request.get_json()
-        name = req.get("model", "Random Forest")
-        base_name = name.replace(" (Optimizado)", "")
+        path_feather = STATIC_DIR / "data_feature_engineering.feather"
+        df = pd.read_feather(str(path_feather))
+        total_rows = len(df)
+        start = (page - 1) * per_page
+        end = start + per_page
+        
+        cols_to_show = FEATURES_ML + ["hazardous"]
+        sub_df = df[cols_to_show].iloc[start:end].copy()
+        
+        if "is_coplanar" in sub_df.columns:
+            sub_df["is_coplanar"] = sub_df["is_coplanar"].astype(str)
+            
+        data_rows = sub_df.to_dict(orient="records")
+        return {
+            "status": "ok",
+            "total": total_rows,
+            "page": page,
+            "per_page": per_page,
+            "rows": data_rows
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post('/api/xai/permutation')
+async def get_permutation_importance(payload: dict[str, Any]):
+    try:
+        name = payload.get('model', 'Random Forest')
+        base_name = name.replace(' (Optimizado)', '')
         model = MODELOS_POOL.get(name) or MODELOS_POOL.get(base_name)
+
         if not model:
-            return jsonify({"status": "error", "message": "Modelo no encontrado"}), 400
-        r = permutation_importance(model, X_TEST_SCALED, Y_TEST, n_repeats=5, random_state=42, n_jobs=-1)
+            raise HTTPException(status_code=400, detail='Modelo no encontrado')
+            
+        # Ejecución sobre los datos crudos originales
+        r = permutation_importance(model, X_TEST, Y_TEST, n_repeats=5, random_state=42, n_jobs=-1)
         lista_importancias = []
         for idx, feat in enumerate(FEATURES_ML):
             lista_importancias.append({
-                "feature": feat,
-                "importance_mean": float(r.importances_mean[idx]),
-                "importance_std": float(r.importances_std[idx])
+                'feature': feat,
+                'importance_mean': float(r.importances_mean[idx]),
+                'importance_std': float(r.importances_std[idx])
             })
-        lista_importancias = sorted(lista_importancias, key=lambda x: x["importance_mean"], reverse=True)
-        return jsonify({"status": "ok", "permutations": lista_importancias})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        lista_importancias = sorted(lista_importancias, key=lambda x: x['importance_mean'], reverse=True)
+        return {'status': 'ok', 'permutations': lista_importancias}
+    except HTTPException as he: raise he
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
-@app.route("/api/xai/pdp-ice", methods=["POST"])
-def get_pdp_ice_data():
+@app.post('/api/xai/pdp-ice')
+async def get_pdp_ice_data(payload: dict[str, Any]):
     try:
-        req = request.get_json()
-        model_name = req.get("model", "Random Forest")
-        feature_name = req.get("feature", "alcohol")
-        base_name = model_name.replace(" (Optimizado)", "")
+        model_name = payload.get('model', 'Random Forest')
+        feature_name = payload.get('feature')
+        if not feature_name and FEATURES_ML: feature_name = FEATURES_ML[0]
+        base_name = model_name.replace(' (Optimizado)', '')
         model = MODELOS_POOL.get(model_name) or MODELOS_POOL.get(base_name)
+        
         if not model or feature_name not in FEATURES_ML:
-            return jsonify({"status": "error", "message": "Parámetros inválidos"}), 400
-        feat_idx = FEATURES_ML.index(feature_name)
-        pdp_res = partial_dependence(model, X_TRAIN_SCALED, features=[feat_idx], kind="both", grid_resolution=25)
-        grid_values = pdp_res["grid_values"][0].tolist()
-        pdp_values = pdp_res["average"][0].tolist()
-        ice_lines = pdp_res["individual"][0].tolist()
-        return jsonify({"status": "ok", "grid": grid_values, "pdp": pdp_values, "ice": ice_lines[:30]})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route("/api/xai/shap", methods=["POST"])
-def get_shap_values():
-    try:
-        req = request.get_json()
-        model_name = req.get("model", "Random Forest")
-        base_name = model_name.replace(" (Optimizado)", "")
-        model = MODELOS_POOL.get(model_name) or MODELOS_POOL.get(base_name)
-        
-        if not model:
-            return jsonify({"status": "error", "message": "Modelo inválido"}), 400
+            raise HTTPException(status_code=400, detail='Parámetros inválidos')
             
-        X_sample = X_TEST_SCALED[:60]
-        
-        if "Random Forest" in base_name or "XGBoost" in base_name:
-            explainer = shap.TreeExplainer(model)
-            shap_values = explainer.shap_values(X_sample)
-        else:
-            explainer = shap.KernelExplainer(model.predict_proba, shap.kmeans(X_TRAIN_SCALED, 5))
-            shap_values = explainer.shap_values(X_sample)
+        feat_idx = FEATURES_ML.index(feature_name)
+        # PDP ejecutado sobre X_TRAIN original para respetar los límites físicos reales de los sliders
+        pdp_res = partial_dependence(model, X_TRAIN, features=[feat_idx], kind='both', grid_resolution=25)
+        return {
+            'status': 'ok',
+            'grid': pdp_res['grid_values'][0].tolist(),
+            'pdp': pdp_res['average'][0].tolist(),
+            'ice': pdp_res['individual'][0].tolist()[:30]
+        }
+    except HTTPException as he: raise he
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
+@app.post('/api/xai/shap')
+async def get_shap_values(payload: dict[str, Any]):
+
+    try:
+        model_name = payload.get('model', 'Random Forest')
+        base_name = model_name.replace(' (Optimizado)', '')
+        model = MODELOS_POOL.get(model_name) or MODELOS_POOL.get(base_name)
+        if not model: raise HTTPException(status_code=400, detail='Modelo inválido')
+        
+        # Muestra tomada directamente de los datos reales para el gráfico sumario de SHAP
+        X_sample = X_TEST[:60]
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(X_sample)
+        
         if isinstance(shap_values, list):
-            vals = np.array(shap_values[1], dtype=np.float64)
-        elif hasattr(shap_values, "values"):
+            vals = np.array(shap_values[1] if len(shap_values) > 1 else shap_values[0], dtype=np.float64)
+        elif hasattr(shap_values, 'values'):
             v_raw = shap_values.values
-            if len(v_raw.shape) == 3:
-                vals = np.array(v_raw[:, :, 1], dtype=np.float64)
-            else:
-                vals = np.array(v_raw, dtype=np.float64)
+            vals = np.array(v_raw[:, :, 1] if len(v_raw.shape) == 3 else v_raw, dtype=np.float64)
         else:
             shap_arr = np.array(shap_values, dtype=np.float64)
-            if len(shap_arr.shape) == 3:
-                vals = shap_arr[:, :, 1]
-            else:
-                vals = shap_arr
+            vals = shap_arr[:, :, 1] if len(shap_arr.shape) == 3 else shap_arr
             
-        return jsonify({
-            "status": "ok",
-            "features": FEATURES_ML,
-            "shap_values": vals.tolist(),
-            "real_values": X_sample.tolist()
-        })
-    except Exception as e:
-        print(f"❌ CRASH EN SHAP VALUES: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route("/api/predict-table", methods=["POST"])
-def predict_table():
-    try:
-        data = request.get_json()
-        raw_df = pd.DataFrame(data.get('rows', []))
-        columnas_limpias = [c for c in raw_df.columns if not c.startswith('PRED_')]
-        df_base = raw_df[columnas_limpias].copy()
-        df_infer = df_base.copy()
-        for f in FEATURES_ML:
-            if f not in df_infer.columns:
-                df_infer[f] = 0.0
-        df_infer = df_infer[FEATURES_ML].apply(pd.to_numeric, errors='coerce').fillna(0.0)
-        X_scaled = SCALER_GLOBAL.transform(df_infer.to_numpy())
-        
-        df_preds = pd.DataFrame(index=df_base.index)
-        for name, model in MODELOS_POOL.items():
-            preds = model.predict(X_scaled)
-            col_name = f"PRED_{name.upper().replace(' ', '_').replace('_(OPTIMIZADO)', '_OPT')}"
-            df_preds[col_name] = [CLASES_TARGET[p] for p in preds]
-            
-        df_final = pd.concat([df_preds, df_base], axis=1)
-        return jsonify({"status": "ok", "headers": list(df_final.columns), "rows": df_final.replace({np.nan: None}).to_dict(orient='records')})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route("/api/upload-csv", methods=["POST"])
-def upload_csv():
-    if 'file' not in request.files:
-        return jsonify({"status": "error", "message": "Falta el archivo"}), 400
-    file = request.files['file']
-    try:
-        contenido = file.stream.read().decode("utf-8", errors='replace')
-        df = pd.read_csv(io.StringIO(contenido, newline=None), sep=None, engine='python')
-        columnas_csv = [c.strip() for c in df.columns if not c.strip().startswith('PRED_')]
-        df_base = df[columnas_csv].copy()
-        
-        if all(elem in columnas_csv for elem in FEATURES_ML):
-            df_infer = df_base[FEATURES_ML].copy()
-            matriz_numpy = df_infer.to_numpy()
-        else:
-            registros_archivo = len(df_base) if len(df_base) > 0 else 1
-            matriz_numpy = np.tile(SCALER_GLOBAL.mean_, (registros_archivo, 1))
-            for idx, feat in enumerate(FEATURES_ML):
-                if feat not in df_base.columns:
-                    df_base[feat] = matriz_numpy[:, idx]
-
-        X_scaled = SCALER_GLOBAL.transform(matriz_numpy.astype(float))
-        df_preds = pd.DataFrame(index=df_base.index)
-        for name, model in MODELOS_POOL.items():
-            preds = model.predict(X_scaled)
-            col_name = f"PRED_{name.upper().replace(' ', '_').replace('_(OPTIMIZADO)', '_OPT')}"
-            df_preds[col_name] = [CLASES_TARGET[p] for p in preds]
-
-        df_final = pd.concat([df_preds, df_base], axis=1)
-        df_display = df_final.head(100).replace({np.nan: None})
-        return jsonify({"status": "ok", "headers": list(df_display.columns), "rows": df_display.to_dict(orient='records')})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route("/api/retrain", methods=["POST"])
-def retrain_and_benchmark():
-    try:
-        req = request.get_json()
-        modelo_seleccionado = req.get("model")
-        grid_raw_text = req.get("grid_text", "")
-        param_grid = {}
-        for linea in grid_raw_text.split("\n"):
-            if ":" in linea:
-                clave, valores = linea.split(":", 1)
-                param_grid[clave.strip()] = [evaluar_tipo_estricto(x) for x in valores.split(",")]
-        
-        if modelo_seleccionado == "Random Forest":
-            estimator = RandomForestClassifier(random_state=42)
-        elif modelo_seleccionado == "XGBoost":
-            estimator = XGBClassifier(objective='multi:softprob', random_state=42)
-        elif modelo_seleccionado == "Softmax Regression":
-            # Si max_iter no viene en el texto de la grilla, le metemos 500 por defecto de forma segura
-            if "max_iter" not in param_grid:
-                estimator = LogisticRegression(solver='lbfgs', max_iter=500, random_state=42)
-            else:
-                estimator = LogisticRegression(solver='lbfgs', random_state=42)
-        else:
-            estimator = GaussianNB()
-            
-        resultados_lista = []
-        t_start = time.perf_counter()
-        gs = GridSearchCV(estimator, param_grid, cv=3, scoring='accuracy', n_jobs=-1)
-        gs.fit(X_TRAIN_SCALED, Y_TRAIN)
-        t_grid = time.perf_counter() - t_start
-        resultados_lista.append({
-            "estrategia": "Grid Search (Fuerza Bruta)",
-            "tiempo": f"{t_grid:.4f}s",
-            "test_acc": f"{accuracy_score(Y_TEST, gs.best_estimator_.predict(X_TEST_SCALED))*100:.2f}%"
-        })
-        t_start = time.perf_counter()
-        try:
-            max_comb = int(np.prod([len(v) for v in param_grid.values()]))
-        except Exception:
-            max_comb = 1
-        n_iteraciones = max(1, min(8, max_comb))
-        rs = RandomizedSearchCV(estimator, param_grid, n_iter=n_iteraciones, cv=3, scoring='accuracy', n_jobs=-1, random_state=42)
-        rs.fit(X_TRAIN_SCALED, Y_TRAIN)
-        t_random = time.perf_counter() - t_start
-        resultados_lista.append({
-            "estrategia": "Random Search (Muestreo)",
-            "tiempo": f"{t_random:.4f}s",
-            "test_acc": f"{accuracy_score(Y_TEST, rs.best_estimator_.predict(X_TEST_SCALED))*100:.2f}%"
-        })
-        t_start = time.perf_counter()
-        
-        def objective(trial):
-            params = {}
-            for param_name, valores in param_grid.items():
-                if any(isinstance(x, str) or isinstance(x, bool) for x in valores):
-                    params[param_name] = trial.suggest_categorical(param_name, valores)
-                else:
-                    if len(valores) == 1:
-                        params[param_name] = valores[0]
-                    else:
-                        p_min, p_max = min(valores), max(valores)
-                        if p_min == p_max:
-                            params[param_name] = p_min
-                        elif any(isinstance(x, float) for x in valores) or 'e' in str(p_min).lower():
-                            params[param_name] = trial.suggest_float(param_name, float(p_min), float(p_max))
-                        else:
-                            params[param_name] = trial.suggest_int(param_name, int(p_min), int(p_max))
-            if modelo_seleccionado == "Random Forest":
-                clf = RandomForestClassifier(**params, random_state=42)
-            elif modelo_seleccionado == "XGBoost":
-                clf = XGBClassifier(**params, objective='multi:softprob', random_state=42)
-            elif modelo_seleccionado == "Softmax Regression":
-                # 3. CORRECCIÓN MULTICLASE: Removido en el estimador dinámico del bucle interno de Optuna
-                if "max_iter" not in params:
-                    params["max_iter"] = 500
-                clf = LogisticRegression(**params, solver='lbfgs', random_state=42)
-            else:
-                clf = GaussianNB(**params)
-            return cross_val_score(clf, X_TRAIN_SCALED, Y_TRAIN, cv=3, scoring='accuracy').mean()
-            
-        study = optuna.create_study(direction="maximize")
-        study.optimize(objective, n_trials=10)
-        t_optuna = time.perf_counter() - t_start
-        
-        if modelo_seleccionado == "Random Forest":
-            opt_clf = RandomForestClassifier(**study.best_params, random_state=42).fit(X_TRAIN_SCALED, Y_TRAIN)
-        elif modelo_seleccionado == "XGBoost":
-            opt_clf = XGBClassifier(**study.best_params, objective='multi:softprob', random_state=42).fit(X_TRAIN_SCALED, Y_TRAIN)
-        elif modelo_seleccionado == "Softmax Regression":
-            # Si Optuna ya optimizó max_iter, dejamos que use ese. Si no, le metemos 500.
-            if "max_iter" not in study.best_params:
-                study.best_params["max_iter"] = 500
-            opt_clf = LogisticRegression(**study.best_params, solver='lbfgs', random_state=42).fit(X_TRAIN_SCALED, Y_TRAIN)
-        else:
-            opt_clf = GaussianNB(**study.best_params).fit(X_TRAIN_SCALED, Y_TRAIN)
-            
-        resultados_lista.append({
-            "estrategia": "Optuna (Muestreo Bayesiano)",
-            "tiempo": f"{t_optuna:.4f}s",
-            "test_acc": f"{accuracy_score(Y_TEST, opt_clf.predict(X_TEST_SCALED))*100:.2f}%"
-        })
-        nombre_optimizado = f"{modelo_seleccionado} (Optimizado)"
-        MODELOS_POOL[nombre_optimizado] = gs.best_estimator_
-        y_pred = gs.best_estimator_.predict(X_TEST_SCALED)
-        y_train_pred = gs.best_estimator_.predict(X_TRAIN_SCALED)
-        CACHED_DATA["modelos"][nombre_optimizado] = {
-            "train_acc": f"{accuracy_score(Y_TRAIN, y_train_pred)*100:.2f}%",
-            "test_acc": resultados_lista[0]["test_acc"],
-            "precision": f"{precision_score(Y_TEST, y_pred, average='macro')*100:.2f}%",
-            "recall": f"{recall_score(Y_TEST, y_pred, average='macro')*100:.2f}%",
-            "es_optimizado": True
+        return {
+            'status': 'ok',
+            'features': FEATURES_ML,
+            'shap_values': vals.tolist(),
+            'real_values': X_sample.values.tolist()
         }
-        pool_convertido_lista = []
-        for name, stats in CACHED_DATA["modelos"].items():
-            pool_convertido_lista.append({
-                "arquitectura": name, "train_acc": stats["train_acc"], "test_acc": stats["test_acc"], "precision": stats["precision"], "es_optimizado": stats.get("es_optimizado", False)
-            })
-        return jsonify({"status": "ok", "benchmark_lista": resultados_lista, "pool_lista": pool_convertido_lista})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    except HTTPException as he: raise he
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
-def evaluar_tipo_estricto(v_str):
-    v = v_str.strip()
-    if v.lower() == 'true': return True
-    if v.lower() == 'false': return False
+@app.post("/api/predict")
+async def predict(payload: AsteroidPredictRequest):
     try:
-        if 'e' in v.lower() or '.' in v: return float(v)
-        return int(v)
-    except ValueError:
-        return v
+        selected_model_name = payload.model_name.value
+        model = MODELOS_POOL.get(selected_model_name)
+        
+        if not model:
+            raise HTTPException(status_code=400, detail=f"El modelo '{selected_model_name}' no está cargado.")
+            
+        data_dict = payload.model_dump()
+        input_row = {feat: data_dict[feat] for feat in FEATURES_ML}
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
+        # Construcción inicial del DataFrame
+        input_data = pd.DataFrame([input_row], columns=FEATURES_ML)
+        
+        # --- CORRECCIÓN CRUCIAL PARA XGBOOST Y COHERENCIA DE TIPOS ---
+        # Convertimos la columna al tipo categórico exacto que espera XGBoost
+        if "orbit_uncertainity" in input_data.columns:
+            input_data["orbit_uncertainity"] = input_data["orbit_uncertainity"].astype(TIPO_ORDINAL_XGB)
+
+        # Prediction
+        prediction = model.predict(input_data)[0]
+
+        # Manejo de umbral por si el modelo devuelve probabilidades o clases directas
+        pred_idx = 0 if prediction < 0.5 else 1
+        clase_predicha = CLASES_TARGET[pred_idx]
+        
+        probabilidades = None
+
+        if hasattr(model, "predict_proba"):
+            prob_arr = model.predict_proba(input_data)[0]
+            probabilidades = [float(p) for p in prob_arr]
+            
+        return {
+            "status": "ok",
+            "modelo_utilizado": selected_model_name,
+            "prediccion": {
+                "clase_index": pred_idx,
+                "clase_nombre": clase_predicha,
+                "probabilidades": probabilidades
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en inferencia: {str(e)}")
+
+if __name__ == '__main__':
+    uvicorn.run('app:app', host='0.0.0.0', port=8000, reload=True)

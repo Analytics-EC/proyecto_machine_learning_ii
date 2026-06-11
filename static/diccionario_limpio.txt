@@ -1,0 +1,41 @@
+campo_json	tipo_detectado	descripcion
+absolute_magnitude_h	float	Magnitud absoluta H del objeto; proxy de brillo/tamaño intrínseco.
+close_approach_date	string	Fecha de aproximación cercana.
+epoch_date_close_approach	integer	Fecha/hora de aproximación en epoch Unix, milisegundos.
+miss_distance.astronomical	string (numérico)	Distancia mínima estimada en astronomical.
+miss_distance.kilometers	string (numérico)	Distancia mínima estimada en kilometers.
+miss_distance.lunar	string (numérico)	Distancia mínima estimada en lunar.
+miss_distance.miles	string (numérico)	Distancia mínima estimada en miles.
+orbiting_body	string	Cuerpo respecto al cual se calcula la aproximación.
+relative_velocity.kilometers_per_hour	string (numérico)	Velocidad relativa en kilometers per hour.
+relative_velocity.kilometers_per_second	string (numérico)	Velocidad relativa en kilometers per second.
+relative_velocity.miles_per_hour	string (numérico)	Velocidad relativa en miles per hour.
+feet.estimated_diameter_max	float	Diámetro máximo estimado en feet.
+feet.estimated_diameter_min	float	Diámetro mínimo estimado en feet.
+kilometers.estimated_diameter_max	float	Diámetro máximo estimado en kilometers.
+kilometers.estimated_diameter_min	float	Diámetro mínimo estimado en kilometers.
+meters.estimated_diameter_max	float	Diámetro máximo estimado en meters.
+meters.estimated_diameter_min	float	Diámetro mínimo estimado en meters.
+miles.estimated_diameter_max	float	Diámetro máximo estimado en miles.
+miles.estimated_diameter_min	float	Diámetro mínimo estimado en miles.
+is_potentially_hazardous_asteroid	boolean	Indicador de si el objeto está clasificado como asteroide potencialmente peligroso.
+name	string	Nombre o designación del objeto cercano a la Tierra.
+neo_reference_id	string (numérico)	Identificador de referencia del objeto NEO en NASA/JPL.
+aphelion_distance	string (numérico)	Distancia al afelio.
+ascending_node_longitude	string (numérico)	Longitud del nodo ascendente, normalmente en grados.
+eccentricity	string (numérico)	Excentricidad de la órbita.
+epoch_osculation	string (numérico)	Época de osculación de los elementos orbitales.
+equinox	string	Equinoccio o marco de referencia de los elementos orbitales.
+inclination	string (numérico)	Inclinación orbital, normalmente en grados.
+jupiter_tisserand_invariant	string (numérico)	Invariante de Tisserand respecto a Júpiter.
+mean_anomaly	string (numérico)	Anomalía media, normalmente en grados.
+mean_motion	string (numérico)	Movimiento medio orbital.
+minimum_orbit_intersection	string (numérico)	Distancia mínima de intersección orbital (MOID).
+orbit_determination_date	string	Fecha en que se determinó o actualizó la órbita.
+orbit_id	string (numérico)	Identificador de la solución orbital.
+orbit_uncertainty	string (numérico)	Código de incertidumbre de la órbita.
+orbital_period	string (numérico)	Periodo orbital, normalmente en días.
+perihelion_argument	string (numérico)	Argumento del perihelio, normalmente en grados.
+perihelion_distance	string (numérico)	Distancia al perihelio.
+perihelion_time	string (numérico)	Tiempo del perihelio.
+semi_major_axis	string (numérico)	Semieje mayor de la órbita.

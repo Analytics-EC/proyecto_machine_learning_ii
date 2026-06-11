@@ -1,0 +1,128 @@
+/* VARIABLES DE MARCA: Consistencia institucional y temática */
+:root {
+    --up-guinda: #8A1538;
+    /* Identidad Universidad UP */
+    --up-oro: #ba9357;
+    /* Identidad Institucional UP */
+    --nasa-dark: #0B1D33;
+    /* Azul Espacial Profundo (Centro de Control) */
+    --nasa-blue: #0056B3;
+    /* Azul Vector de la NASA */
+    --space-bg: #F4F6F9;
+    /* Fondo claro académico texturizado */
+}
+
+body,
+.v-application {
+    background-color: var(--space-bg) !important;
+    font-family: 'Helvetica Neue', 'Roboto', sans-serif;
+    scroll-behavior: smooth;
+    color: #2D3748;
+}
+
+/* NAVBAR INSTITUCIONAL: Elegante, limpio y corporativo */
+.up-navbar {
+    background-color: #FFFFFF !important;
+    border-bottom: 4px solid var(--up-guinda);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Identidad de Marca en Navbar (Si usas el logo) */
+.nasa-logo-img {
+    height: 42px;
+    object-fit: contain;
+    filter: drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.1));
+    transition: transform 0.3s ease;
+}
+
+.nasa-logo-img:hover {
+    transform: scale(1.05);
+}
+
+/* JERARQUÍAS DE TEXTO Y ACCENTOS */
+.text-navy {
+    color: var(--nasa-dark) !important;
+}
+
+.text-guinda {
+    color: var(--up-guinda) !important;
+}
+
+.text-oro {
+    color: var(--up-oro) !important;
+}
+
+/* BOTONES Y PANELES PRIMARIOS (Estilo Tech-Militar NASA) */
+.bg-navy {
+    background: linear-gradient(135deg, var(--nasa-dark) 0%, #17365D 100%) !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 4px 15px rgba(11, 29, 51, 0.2) !important;
+    transition: all 0.3s ease !important;
+}
+
+.bg-navy:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(11, 29, 51, 0.3) !important;
+}
+
+/* SECCIONES LANDING: Contenedores limpios con sutiles sombras modernas */
+.landing-section {
+    padding: 50px 40px;
+    background: #FFFFFF;
+    margin-bottom: 35px;
+    border-radius: 20px;
+    border: 1px solid rgba(11, 29, 51, 0.05);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.02);
+}
+
+/* BADGES DE PASOS / TIMELINE: Fusión UP y NASA */
+.timeline-badge {
+    background: linear-gradient(135deg, var(--up-guinda) 0%, #5C0B22 100%);
+    color: #FFFFFF;
+    border: 2px solid var(--up-oro);
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 10px rgba(138, 21, 56, 0.2);
+}
+
+/* METRIC CARDS: Tarjetas de rendimiento del modelo de Inteligencia Artificial */
+.metric-card {
+    border-top: 4px solid var(--up-guinda) !important;
+    border-left: 1px solid rgba(0, 0, 0, 0.05) !important;
+    border-right: 1px solid rgba(0, 0, 0, 0.05) !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+    background: #FFFFFF !important;
+    border-radius: 12px !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(138, 21, 56, 0.08) !important;
+}
+
+/* MEJORA ADICIONAL PARA LAS TABLAS DE DATOS */
+.v-data-table-server {
+    border-radius: 12px !important;
+    overflow: hidden;
+    border: 1px solid rgba(11, 29, 51, 0.08) !important;
+}
+
+.v-data-table-server .v-data-table-header {
+    background-color: #F8FAFC !important;
+}
+
+.v-data-table-server th {
+    font-weight: 700 !important;
+    color: var(--nasa-dark) !important;
+    text-transform: uppercase;
+    font-size: 0.78rem !important;
+    letter-spacing: 0.5px;
+}
