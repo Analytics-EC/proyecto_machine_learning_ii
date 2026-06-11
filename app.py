@@ -220,17 +220,26 @@ async def get_permutation_importance(payload: dict[str, Any]):
         if not model:
             raise HTTPException(status_code=400, detail='Modelo no encontrado')
             
-        # Ejecución sobre los datos crudos originales
-        r = permutation_importance(model, X_TEST, Y_TEST, n_repeats=5, random_state=42, n_jobs=-1)
+        # 1. Consultar directamente la importancia nativa del modelo (Gini / Gain)
+        if hasattr(model, 'feature_importances_'):
+            importances = model.feature_importances_
+        else:
+            raise HTTPException(status_code=400, detail='El modelo no soporta feature_importances_ nativo')
+
         lista_importancias = []
         for idx, feat in enumerate(FEATURES_ML):
             lista_importancias.append({
                 'feature': feat,
-                'importance_mean': float(r.importances_mean[idx]),
-                'importance_std': float(r.importances_std[idx])
+                'importance_mean': float(importances[idx]),
+                'importance_std': 0.0 # La importancia nativa es un valor determinístico, no tiene desviación estándar
             })
+            
+        # 2. Ordenar de mayor a menor importancia
         lista_importancias = sorted(lista_importancias, key=lambda x: x['importance_mean'], reverse=True)
+        
+        # Mantenemos la llave 'permutations' en el JSON para compatibilidad con el Frontend
         return {'status': 'ok', 'permutations': lista_importancias}
+        
     except HTTPException as he: raise he
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
