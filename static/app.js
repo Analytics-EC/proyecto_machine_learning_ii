@@ -247,9 +247,16 @@ createApp({
                 if (data.status === 'ok') {
                     resultadoPrediccion.value = {
                         clase_predicha: data.prediccion.clase_nombre,
-                        probabilidades: data.prediccion.probabilidades
+                        probabilidades: data.prediccion.probabilidades,
+                        explicacion_local: data.explicacion_local // CAPTURAMOS XAI
                     };
                     console.log("Predicción asignada con éxito:", resultadoPrediccion.value);
+                    
+                    // Renderizamos la gráfica después de que Vue actualice el DOM
+                    setTimeout(() => {
+                        renderLocalShap(data.explicacion_local, data.modelo_utilizado);
+                    }, 100);
+
                 } else {
                     console.error("El backend respondió con un estado de error:", data);
                 }
@@ -258,6 +265,45 @@ createApp({
             } finally {
                 prediccionLoading.value = false;
             }
+        };
+
+        const renderLocalShap = (explicacion, modelName) => {
+            const localShapFeatures = explicacion.features;
+            const localShapValues = explicacion.shap_values;
+            const baseValue = explicacion.base_value;
+
+            // Creamos un array de objetos para poder ordenarlos por magnitud de impacto
+            let shapData = localShapFeatures.map((feat, idx) => ({
+                feature: feat,
+                value: localShapValues[idx]
+            }));
+
+            // Ordenamos por valor absoluto para que las variables más influyentes queden visualmente destacadas
+            shapData.sort((a, b) => Math.abs(a.value) - Math.abs(b.value));
+
+            const xData = shapData.map(d => d.value);
+            const yData = shapData.map(d => d.feature);
+            
+            // Colores: Guinda si aumenta el riesgo, Navy si lo disminuye
+            const colors = shapData.map(d => d.value > 0 ? '#8B1D2F' : '#132B4F'); 
+
+            // Textos dinámicos dependiendo de la matemática interna del modelo
+            const unitType = modelName.includes('XGBoost') ? 'Log-Odds' : 'Probabilidad (%)';
+
+            Plotly.newPlot('chart-local-shap', [{
+                x: xData,
+                y: yData,
+                type: 'bar',
+                orientation: 'h',
+                marker: { color: colors },
+                text: xData.map(v => (v > 0 ? '+' : '') + v.toFixed(3)),
+                textposition: 'auto',
+                insidetextfont: { color: 'white' }
+            }], {
+                title: `Fuerzas Predictivas SHAP (${unitType} | Base: ${baseValue.toFixed(3)})`,
+                margin: { l: 180, r: 20, t: 40, b: 40 },
+                xaxis: { title: `Impacto direccional en la predicción` }
+            }, { responsive: true });
         };
 
         onMounted(async () => {

@@ -72,7 +72,7 @@
                                                 </v-avatar>
                                             </template>
                                             <v-list-item-title class="text-subtitle-1 font-weight-bold text-navy">
-                                                Gerardo David Rivero Rique
+                                                Gerardo David Rivero Riqué
                                             </v-list-item-title>
                                         </v-list-item>
 
@@ -469,6 +469,21 @@
                                         <p class="text-body-2 px-6">Modifica los deslizadores de la izquierda y presiona
                                             el botón "Send" para evaluar el asteroide en tiempo real.</p>
                                     </div>
+                                </v-card>
+                            </v-col>
+                        </v-row>
+
+                        <v-row class="mt-4" v-if="resultadoPrediccion && resultadoPrediccion.explicacion_local">
+                            <v-col cols="12">
+                                <v-card class="pa-6 rounded-xl border shadow-sm bg-white">
+                                    <h3 class="text-h6 text-navy font-weight-bold mb-2">
+                                        <v-icon color="#8B1D2F" start>mdi-chart-bar</v-icon>
+                                        ¿Por qué el modelo tomó esta decisión?
+                                    </h3>
+                                    <p class="text-caption text-grey-darken-1 mb-4">
+                                        El siguiente gráfico deconstruye matemáticamente la inferencia actual. Las barras color guinda (hacia la derecha) representan fuerzas físicas que incrementaron la probabilidad de peligro, mientras que las barras oscuras (hacia la izquierda) actuaron como atenuantes de riesgo.
+                                    </p>
+                                    <div id="chart-local-shap" style="width:100%; height:400px;"></div>
                                 </v-card>
                             </v-col>
                         </v-row>

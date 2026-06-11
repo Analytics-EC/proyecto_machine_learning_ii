@@ -303,7 +303,8 @@ async def get_shap_values(payload: dict[str, Any]):
 async def predict(payload: AsteroidPredictRequest):
     try:
         selected_model_name = payload.model_name.value
-        model = MODELOS_POOL.get(selected_model_name)
+        base_name = selected_model_name.replace(' (Optimizado)', '')
+        model = MODELOS_POOL.get(selected_model_name) or MODELOS_POOL.get(base_name)
         
         if not model:
             raise HTTPException(status_code=400, detail=f"El modelo '{selected_model_name}' no está cargado.")
@@ -315,14 +316,12 @@ async def predict(payload: AsteroidPredictRequest):
         input_data = pd.DataFrame([input_row], columns=FEATURES_ML)
         
         # --- CORRECCIÓN CRUCIAL PARA XGBOOST Y COHERENCIA DE TIPOS ---
-        # Convertimos la columna al tipo categórico exacto que espera XGBoost
         if "orbit_uncertainity" in input_data.columns:
             input_data["orbit_uncertainity"] = input_data["orbit_uncertainity"].astype(TIPO_ORDINAL_XGB)
 
         # Prediction
         prediction = model.predict(input_data)[0]
 
-        # Manejo de umbral por si el modelo devuelve probabilidades o clases directas
         pred_idx = 0 if prediction < 0.5 else 1
         clase_predicha = CLASES_TARGET[pred_idx]
         
@@ -332,6 +331,32 @@ async def predict(payload: AsteroidPredictRequest):
             prob_arr = model.predict_proba(input_data)[0]
             probabilidades = [float(p) for p in prob_arr]
             
+        # ====================================================
+        # NUEVO: SHAP LOCAL PARA EXPLICABILIDAD DE ESTE INDIVIDUO
+        # ====================================================
+        explainer = shap.TreeExplainer(model)
+        shap_values_out = explainer.shap_values(input_data)
+        
+        # Manejo robusto de la salida de SHAP (depende de la versión y el modelo)
+        if isinstance(shap_values_out, list): 
+            # Scikit-learn (versiones antiguas SHAP): lista de matrices
+            shap_vals_local = shap_values_out[1][0].tolist() # Clase 1 (Peligroso)
+            base_val = explainer.expected_value[1]
+        elif isinstance(shap_values_out, np.ndarray) and len(shap_values_out.shape) == 3:
+            # Scikit-learn (versiones nuevas SHAP): array 3D (n_samples, n_features, n_classes)
+            shap_vals_local = shap_values_out[0, :, 1].tolist() # Instancia 0, todas las features, clase 1
+            base_val = explainer.expected_value[1]
+        else: 
+            # XGBoost: array 2D nativo
+            shap_vals_local = shap_values_out[0].tolist()
+            base_val = explainer.expected_value
+            
+        # Manejo de compatibilidad por si expected_value devuelve un arreglo
+        if isinstance(base_val, (list, np.ndarray)):
+            base_val = base_val[0]
+                
+        base_value_local = float(base_val)
+
         return {
             "status": "ok",
             "modelo_utilizado": selected_model_name,
@@ -339,11 +364,15 @@ async def predict(payload: AsteroidPredictRequest):
                 "clase_index": pred_idx,
                 "clase_nombre": clase_predicha,
                 "probabilidades": probabilidades
+            },
+            "explicacion_local": {
+                "base_value": base_value_local,
+                "shap_values": shap_vals_local,
+                "features": FEATURES_ML
             }
         }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en inferencia: {str(e)}")
-
 if __name__ == '__main__':
     uvicorn.run('app:app', host='0.0.0.0', port=8000, reload=True)
